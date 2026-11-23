@@ -50,10 +50,27 @@ USER_AGENT = "StrykCricketAnalytics/0.1 (cricket analytics project)"
 THUMB_WIDTH = 320
 
 
-def _get(url: str, accept: str, timeout: int = 120) -> bytes:
+MAX_RETRIES = 6
+
+
+def _get(url: str, accept: str, timeout: int = 120, retries: int = MAX_RETRIES) -> bytes:
+    """GET with backoff: Wikimedia rate-limits bursts with 429 + Retry-After."""
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - fixed https hosts
-        return resp.read()
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - fixed https hosts
+                return resp.read()
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (429, 503) or attempt == retries:
+                raise
+            try:
+                wait = float(exc.headers.get("Retry-After", ""))
+            except ValueError:
+                wait = 0.0
+            wait = min(max(wait, 2.0 * 2**attempt), 120.0)
+            print(f"  rate limited ({exc.code}), retrying in {wait:.0f}s")
+            time.sleep(wait)
+    raise AssertionError("unreachable")
 
 
 def players_with_cricinfo() -> dict[str, tuple[str, str]]:
@@ -148,7 +165,9 @@ def main() -> int:
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     credits: dict[str, dict] = {}
-    saved = skipped = failed = 0
+    saved = skipped = failed = deferred = 0
+    consecutive_failures = 0
+    blocked = False
     for index, (pid, filename) in enumerate(sorted(wanted.items()), 1):
         credit = credits_by_file.get(filename)
         if not credit:
@@ -157,17 +176,33 @@ def main() -> int:
             continue
         target = OUT_DIR / f"{pid}.jpg"
         if not target.exists():
+            if blocked:
+                # Keep walking the list so photos already on disk still get
+                # their credits recorded; just stop asking for new ones.
+                deferred += 1
+                continue
             url = (
                 "https://commons.wikimedia.org/wiki/Special:FilePath/"
                 f"{urllib.parse.quote(filename)}?width={THUMB_WIDTH}"
             )
             try:
-                target.write_bytes(_get(url, "image/*", timeout=60))
+                # Few retries: once the thumbnail server blocks this client the
+                # block lasts many minutes, so long backoff per photo only turns
+                # a blocked run into an hours-long one.
+                target.write_bytes(_get(url, "image/*", timeout=60, retries=1))
+                consecutive_failures = 0
             except Exception as exc:  # noqa: BLE001
                 print(f"  could not fetch {filename}: {exc}")
                 failed += 1
+                consecutive_failures += 1
+                if consecutive_failures >= 3:
+                    blocked = True
+                    print("  Wikimedia is blocking downloads; stopping here. "
+                          "Re-run later - photos already saved are kept.")
                 continue
-            time.sleep(0.25)
+            # Faster pacing (0.25s) trips Wikimedia's thumbnail rate limit after
+            # ~50 images, and the block then outlasts every retry.
+            time.sleep(1.0)
         credits[pid] = {
             "file": filename,
             "author": credit["author"],
@@ -187,6 +222,9 @@ def main() -> int:
         print(f"{skipped} skipped: no readable licence, so they cannot be credited")
     if failed:
         print(f"{failed} failed to download")
+    if deferred:
+        print(f"{deferred} not attempted after Wikimedia started blocking - re-run "
+              "this script in 15-30 minutes to fetch them")
     print("Players without a photo fall back to their generated monogram.")
     return 0
 

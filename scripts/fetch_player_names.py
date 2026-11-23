@@ -9,10 +9,16 @@ register does carry each player's ESPNcricinfo id, and Wikidata publishes full
 names keyed on that same id. Joining the two gives a real, sourced full name
 for ~97% of the players in the IPL dataset.
 
-Two requests total, both to public bulk endpoints - no per-player scraping:
+Three bulk requests to public endpoints do most of the work:
 
   1. https://cricsheet.org/register/people.csv   identifier -> cricinfo id
   2. Wikidata SPARQL (property P2697)            cricinfo id -> full name
+  3. Wikidata SPARQL (skos:altLabel)             cricinfo id -> aliases
+
+Players still in initials form after that are looked up one at a time through
+Wikidata's search API (one request per second, retried on HTTP 429). Results
+are written to the database only at the end of the run, and a running API must
+then be reloaded (POST /api/admin/reload) to see them.
 
 Output: data/raw/people/full_names.csv (cricsheet_id, scorecard_name, full_name)
 

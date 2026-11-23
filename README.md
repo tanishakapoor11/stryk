@@ -19,11 +19,14 @@ pip install -r backend/requirements.txt
 # 2. Data (≈ 20 MB download, ~1,200 match files)
 python scripts/fetch_cricsheet.py ipl
 python scripts/ingest.py                 # add --limit 50 for a fast smoke import
-python scripts/fetch_player_names.py     # resolves "SS Iyer" -> "Shreyas Iyer"
+python scripts/fetch_player_names.py     # required for name search: "SS Iyer" -> "Shreyas Iyer"
 python scripts/fetch_player_photos.py    # optional: freely licensed portraits
 
 # 3. API on :8000
 cd backend && uvicorn app.main:app --reload
+
+# If the API was already running while step 2 ran, it is still serving the old data:
+curl -X POST http://127.0.0.1:8000/api/admin/reload
 
 # 4. Frontend on :3000 (separate terminal)
 cd frontend && npm install && npm run dev
@@ -33,6 +36,33 @@ Open <http://localhost:3000>. The frontend reads `API_URL` from `frontend/.env.l
 (default `http://127.0.0.1:8000`).
 
 Tests: `cd backend && python -m pytest`
+
+**Gotchas on a fresh setup**
+
+- **Skip `fetch_player_names.py` and search only knows scorecard names.** `Shreyas`
+  finds nothing; only `SS Iyer` does, and Prabhsimran Singh shows as `P Simran Singh`.
+  Ingest creates the players with scorecard names; this script adds the full names and
+  aliases that search depends on (see [Player names](#player-names)).
+- **The API caches the dataset in memory.** It is loaded on the first request and kept,
+  so anything the scripts write afterwards — new matches, names, aliases — is invisible
+  until `POST /api/admin/reload` or a server restart. Stale names after a successful
+  name fetch almost always mean this.
+- **The frontend caches the photo credits.** `lib/photos.ts` reads
+  `public/players/credits.json` once and keeps it, and a photo is only shown when it
+  has a credit entry. After fetching photos, restart `npm run dev` to see them.
+- **Run the name and photo scripts one after the other, never at the same time.** Both
+  call Wikimedia, which rate-limits with HTTP 429. Both scripts back off and retry, but
+  in parallel they slow each other down. A photo run that reports
+  `saved 0 photo(s)` / `skipped: no readable licence` was rate-limited: re-run it on
+  its own. The thumbnail server also blocks after a burst of new downloads; the
+  script then stops early and says so. Re-run it 15–30 minutes later, and it fetches
+  only what is still missing.
+- **The name fetch takes several minutes.** The bulk queries are quick, but players they
+  miss are looked up one at a time, a second apart, and nothing is written to the
+  database until the run ends.
+- **"Internal error computing this analysis" on every page** with
+  `unable to open database file` in the API log means `ingest.py` has not been run, so
+  `data/processed/stryk.db` does not exist.
 
 ---
 
@@ -122,11 +152,16 @@ Cricsheet identifies players the way a scorecard does: initials plus surname, so
 Shreyas Iyer is `SS Iyer` and Jasprit Bumrah is `JJ Bumrah`. Nobody searches like
 that, so the product resolves a real full name for every player it can.
 
-`scripts/fetch_player_names.py` makes **two** requests to public bulk endpoints — no
-per-player scraping:
+`scripts/fetch_player_names.py` does most of the work with three bulk requests to
+public endpoints:
 
 1. `cricsheet.org/register/people.csv` — Cricsheet identifier to ESPNcricinfo id.
 2. Wikidata SPARQL (property `P2697`, "ESPNcricinfo player ID") — that id to a full name.
+3. Wikidata SPARQL for English aliases on the same items (see below).
+
+Players still unresolved after that, and still in initials form, are looked up one at a
+time through Wikidata's search API, one request per second, with retries on HTTP 429.
+That step is why a run takes minutes rather than seconds.
 
 Joining them resolves **797 of 816 players (97.7%)**. Players it cannot resolve keep
 their scorecard name; no name is ever constructed from the initials. The 19 remaining
@@ -243,7 +278,9 @@ ESPNcricinfo ids used for names (Wikidata property `P18`). Around **44% of playe
 have a freely licensed image, including every one of the top 20 run scorers. Most
 Commons licences require credit, so `scripts/fetch_player_photos.py` records the author
 and licence for each image and the player card displays them; an image whose
-attribution cannot be read is skipped rather than shown uncredited. Players without a
+attribution cannot be read is skipped rather than shown uncredited. Requests back off
+and retry when Wikimedia rate-limits with HTTP 429 — without that, a throttled run
+skipped every image because no licence could be read. Players without a
 photo fall back to a monogram in their franchise's colour, so the interface never
 depends on a photo existing.
 
