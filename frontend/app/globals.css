@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-canvas text-ink antialiased;
+  }
+  /* Figures are read down a column, so every number is tabular. This is the
+     only place monospace is used: it is doing alignment work, not decoration. */
+  .num {
+    @apply font-mono tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+  ::selection {
+    @apply bg-accent/30;
+  }
+  *:focus-visible {
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Cards that go somewhere: a small lift on hover, and a press on click, so
+     the whole card reads as the control rather than just the link inside it. */
+  .card-interactive {
+    @apply transition-all duration-200 ease-snap hover:-translate-y-0.5 hover:shadow-lift active:translate-y-0;
+  }
+
+  /* Sentence case, not tracked-out capitals: a label should name the thing,
+     quietly, and get out of the way. */
+  .label-xs {
+    @apply text-2xs font-medium text-ink-faint;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded bg-line-strong;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

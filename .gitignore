@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+
+# Data: ~200 MB of downloaded Cricsheet JSON and the built database.
+# Both are reproducible from scripts/fetch_cricsheet.py and scripts/ingest.py.
+data/raw/
+data/processed/
+!data/raw/auction/prices.csv
+
+# Node
+node_modules/
+.next/
