@@ -24,12 +24,18 @@ from app.analytics.constants import (
     NOT_OUT_RETIREMENTS,
     phase_for_over,
 )
+from app.catalog import HERE as CATALOG_DIR
+from app.catalog import MatchContext, normalise_gender
 from app.models import (
+    DATA_LEVEL_BALL_BY_BALL,
+    DataSource,
     Delivery,
     Dismissal,
+    ExternalId,
     IngestionLog,
     Innings,
     Match,
+    MatchOfficial,
     MatchPlayer,
     Player,
     Team,
@@ -38,34 +44,36 @@ from app.models import (
 
 log = logging.getLogger("stryk.ingest")
 
-#: Franchise renames. Deliveries are stored against the current franchise so a
-#: team page is continuous across a rebrand. Deccan Chargers is intentionally
-#: NOT merged into Sunrisers Hyderabad: the franchise was terminated in 2012
-#: and SRH was sold as a new entity, so merging them would invent history.
-TEAM_CANONICAL = {
-    "Delhi Daredevils": "Delhi Capitals",
-    "Kings XI Punjab": "Punjab Kings",
-    "Royal Challengers Bangalore": "Royal Challengers Bengaluru",
-    "Rising Pune Supergiants": "Rising Pune Supergiant",
+def _team_config() -> dict:
+    """Renames and short names, from app/catalog/teams.json (data, not code)."""
+    return json.loads((CATALOG_DIR / "teams.json").read_text(encoding="utf-8"))
+
+
+_TEAMS = _team_config()
+#: Back-compat view of the men's renames, used by tests and older callers.
+TEAM_CANONICAL: Dict[str, str] = _TEAMS["renames"].get("MEN", {})
+TEAM_SHORT: Dict[str, str] = _TEAMS["short_names"].get("MEN", {})
+
+#: Cricsheet officials keys -> MatchOfficial.role
+OFFICIAL_ROLES = {
+    "umpires": "umpire",
+    "tv_umpires": "tv_umpire",
+    "reserve_umpires": "reserve_umpire",
+    "match_referees": "match_referee",
 }
 
-TEAM_SHORT = {
-    "Mumbai Indians": "MI",
-    "Chennai Super Kings": "CSK",
-    "Kolkata Knight Riders": "KKR",
-    "Rajasthan Royals": "RR",
-    "Royal Challengers Bengaluru": "RCB",
-    "Sunrisers Hyderabad": "SRH",
-    "Punjab Kings": "PBKS",
-    "Delhi Capitals": "DC",
-    "Gujarat Titans": "GT",
-    "Lucknow Super Giants": "LSG",
-    "Deccan Chargers": "DCH",
-    "Pune Warriors": "PWI",
-    "Gujarat Lions": "GL",
-    "Rising Pune Supergiant": "RPS",
-    "Kochi Tuskers Kerala": "KTK",
-}
+
+def normalise_match_type(info: dict) -> str:
+    """The format STRYK records, which is not always the source's label.
+
+    Cricsheet files The Hundred as "T20" with 5-ball overs. It is a different
+    format (100 balls, a 25-ball powerplay), and pooling it with T20 records
+    would compare unlike things, so it is stored as "Hundred".
+    """
+    raw = info.get("match_type", "T20")
+    if raw == "T20" and info.get("balls_per_over") == 5:
+        return "Hundred"
+    return raw
 
 
 class IngestionError(Exception):
@@ -91,23 +99,34 @@ class _Registry:
 
     def __init__(self, db: Session):
         self.db = db
-        self.teams: Dict[str, int] = {
-            name: tid for tid, name in db.execute(select(Team.id, Team.name)).all()
+        #: Keyed by (name, gender): "India" men and "India" women are two teams.
+        self.teams: Dict[tuple, int] = {
+            (name, gender): tid
+            for tid, name, gender in db.execute(select(Team.id, Team.name, Team.gender)).all()
         }
         self.venues: Dict[str, int] = {
             name: vid for vid, name in db.execute(select(Venue.id, Venue.name)).all()
         }
         self.players: set = {pid for (pid,) in db.execute(select(Player.id)).all()}
 
-    def team(self, raw_name: str) -> int:
-        name = TEAM_CANONICAL.get(raw_name, raw_name)
-        if name not in self.teams:
-            aliases = sorted(k for k, v in TEAM_CANONICAL.items() if v == name)
-            row = Team(name=name, short_name=TEAM_SHORT.get(name), aliases=aliases)
+    def team(self, raw_name: str, gender: str = "MEN", national: bool = False) -> int:
+        renames = _TEAMS["renames"].get(gender, {})
+        name = renames.get(raw_name, raw_name)
+        key = (name, gender)
+        if key not in self.teams:
+            aliases = sorted(k for k, v in renames.items() if v == name)
+            row = Team(
+                name=name,
+                short_name=_TEAMS["short_names"].get(gender, {}).get(name),
+                aliases=aliases,
+                gender=gender,
+                team_type="NATIONAL" if national else "OTHER",
+                is_national_team=national,
+            )
             self.db.add(row)
             self.db.flush()
-            self.teams[name] = row.id
-        return self.teams[name]
+            self.teams[key] = row.id
+        return self.teams[key]
 
     def venue(self, name: Optional[str], city: Optional[str]) -> Optional[int]:
         if not name:
@@ -143,7 +162,7 @@ def _season_year(info: dict, stats: IngestStats, match_id: str) -> int:
     return year
 
 
-def _outcome(info: dict, reg: _Registry) -> dict:
+def _outcome(info: dict, team) -> dict:
     out = info.get("outcome") or {}
     res: dict = {
         "winner_id": None,
@@ -154,7 +173,7 @@ def _outcome(info: dict, reg: _Registry) -> dict:
         "eliminator_id": None,
     }
     if "winner" in out:
-        res["winner_id"] = reg.team(out["winner"])
+        res["winner_id"] = team(out["winner"])
         by = out.get("by") or {}
         for key in ("runs", "wickets", "innings"):
             if key in by:
@@ -163,7 +182,7 @@ def _outcome(info: dict, reg: _Registry) -> dict:
     if "eliminator" in out:
         # Super over: the match is a tie decided by the eliminator.
         res["result"] = "tie"
-        res["eliminator_id"] = reg.team(out["eliminator"])
+        res["eliminator_id"] = team(out["eliminator"])
         res["winner_id"] = res["eliminator_id"]
     if "result" in out:
         res["result"] = out["result"]
@@ -186,10 +205,16 @@ def parse_match(path: Path, reg: _Registry, stats: IngestStats) -> dict:
         return reg.player(ident, name)
 
     season = _season_year(info, stats, match_id)
-    match_type = info.get("match_type", "T20")
+    match_type = normalise_match_type(info)
     event = info.get("event") or {}
     if isinstance(event, str):
         event = {"name": event}
+    gender = normalise_gender(info.get("gender", "male"))
+    national = info.get("team_type") == "international"
+
+    def team(name: str) -> int:
+        return reg.team(name, gender=gender, national=national)
+
     teams = info["teams"]
     if len(teams) != 2:
         raise IngestionError(f"{match_id}: expected 2 teams, found {len(teams)}")
@@ -205,20 +230,24 @@ def parse_match(path: Path, reg: _Registry, stats: IngestStats) -> dict:
         "season_label": str(info.get("season", season)),
         "date": dt.date.fromisoformat(info["dates"][0]),
         "venue_id": reg.venue(info.get("venue"), info.get("city")),
-        "team1_id": reg.team(teams[0]),
-        "team2_id": reg.team(teams[1]),
-        "toss_winner_id": reg.team(info["toss"]["winner"]) if info.get("toss") else None,
+        "team1_id": team(teams[0]),
+        "team2_id": team(teams[1]),
+        "toss_winner_id": team(info["toss"]["winner"]) if info.get("toss") else None,
         "toss_decision": (info.get("toss") or {}).get("decision"),
         "player_of_match_id": pid(info["player_of_match"][0]) if info.get("player_of_match") else None,
         "balls_per_over": info.get("balls_per_over", 6),
         "overs_limit": info.get("overs"),
         "source_file": path.name,
-        **_outcome(info, reg),
+        "external_id": match_id,
+        "data_level": DATA_LEVEL_BALL_BY_BALL,
+        **_outcome(info, team),
     }
+    outcome_result = match_row["result"]
+    match_row["status"] = "no_result" if outcome_result == "no result" else "completed"
 
     squad_rows = []
     for team_name, names in (info.get("players") or {}).items():
-        tid = reg.team(team_name)
+        tid = team(team_name)
         for name in names:
             squad_rows.append(
                 {"match_id": match_id, "player_id": pid(name), "team_id": tid, "season": season}
@@ -231,8 +260,8 @@ def parse_match(path: Path, reg: _Registry, stats: IngestStats) -> dict:
     dismissal_rows: List[dict] = []
 
     for idx, inn in enumerate(raw.get("innings", []), start=1):
-        batting_id = reg.team(inn["team"])
-        bowling_id = next(reg.team(t) for t in teams if reg.team(t) != batting_id)
+        batting_id = team(inn["team"])
+        bowling_id = next(team(t) for t in teams if team(t) != batting_id)
         target = inn.get("target") or {}
         is_super = bool(inn.get("super_over"))
         innings_rows.append(
@@ -337,8 +366,28 @@ def parse_match(path: Path, reg: _Registry, stats: IngestStats) -> dict:
     if not delivery_rows:
         stats.warn(f"{match_id}: no deliveries (abandoned match?)")
 
+    officials = []
+    for key, role in OFFICIAL_ROLES.items():
+        for name in (info.get("officials") or {}).get(key, []) or []:
+            ident = people.get(name)
+            if ident is None:
+                stats.warn(f"{match_id}: official {name!r} missing from registry")
+                continue
+            officials.append({"match_id": match_id, "player_id": reg.player(ident, name), "role": role})
+
+    context = MatchContext(
+        event_name=event.get("name"),
+        gender=gender,
+        match_type=match_type,
+        team_type=info.get("team_type"),
+    )
     return {
         "match": match_row,
+        "context": context,
+        "season_label": str(info.get("season", season)),
+        "stage": event.get("stage"),
+        "group": event.get("group"),
+        "officials": officials,
         "squad": squad_rows,
         "innings": innings_rows,
         "deliveries": delivery_rows,
@@ -351,17 +400,28 @@ def ingest_directory(
     directory: Path,
     limit: Optional[int] = None,
     seasons: Optional[Iterable[int]] = None,
+    dataset: Optional[str] = None,
 ) -> IngestStats:
     """Import every Cricsheet JSON file in ``directory``.
 
     Already-imported matches are skipped by id, so the importer is safe to
     re-run and to point at a directory containing additional seasons.
+
+    ``dataset`` is the Cricsheet dataset key the directory came from ("ipl",
+    "wpl", "t20s" ...). It lets the catalogue assign competitions whose source
+    event names have not been verified; it defaults to the directory name with
+    any "_json" suffix removed.
     """
+    from app.ingestion.linking import Linker, refresh_derived
+
+    dataset = dataset or directory.name.removesuffix("_json")
     stats = IngestStats()
     run = IngestionLog(source=str(directory), status="running", warnings=[])
     db.add(run)
     db.commit()
 
+    linker = Linker(db)
+    source_id = db.execute(select(DataSource.id).where(DataSource.slug == "cricsheet")).scalar()
     existing = {mid for (mid,) in db.execute(select(Match.id)).all()}
     reg = _Registry(db)
     season_filter = set(seasons) if seasons else None
@@ -388,6 +448,21 @@ def ingest_directory(
             stats.skipped += 1
             continue
 
+        ctx = parsed["context"]
+        links = linker.link(
+            MatchContext(ctx.event_name, ctx.gender, ctx.match_type, ctx.team_type,
+                         provider="cricsheet", dataset=dataset),
+            parsed["season_label"],
+            parsed["match"]["date"],
+            parsed["stage"],
+            parsed["group"],
+        )
+        linker.classify_teams(
+            {parsed["match"]["team1_id"], parsed["match"]["team2_id"]},
+            links.pop("_competition_type"),
+        )
+        parsed["match"].update(links, source_id=source_id, source_dataset=dataset)
+
         innings_ids = []
         for row in parsed["innings"]:
             row["id"] = next_innings_id
@@ -407,6 +482,11 @@ def ingest_directory(
         db.execute(insert(Match), [parsed["match"]])
         if parsed["squad"]:
             db.execute(insert(MatchPlayer), parsed["squad"])
+        officials = list({(o["player_id"], o["role"]): o for o in parsed["officials"]}.values())
+        if officials:
+            db.execute(insert(MatchOfficial), officials)
+        db.execute(insert(ExternalId), [{"entity_type": "match", "entity_id": parsed["match"]["id"],
+                                         "source": "cricsheet", "external_id": parsed["match"]["id"]}])
         if parsed["innings"]:
             db.execute(insert(Innings), parsed["innings"])
         if parsed["deliveries"]:
@@ -420,6 +500,8 @@ def ingest_directory(
         if stats.ingested % 100 == 0:
             log.info("ingested %s matches (%s deliveries)", stats.ingested, stats.deliveries)
 
+    record_player_ids(db)
+    refresh_derived(db)
     run.finished_at = dt.datetime.utcnow()
     run.matches_seen = stats.seen
     run.matches_ingested = stats.ingested
@@ -429,3 +511,19 @@ def ingest_directory(
     run.status = "completed"
     db.commit()
     return stats
+
+
+def record_player_ids(db: Session) -> None:
+    """Map every person to their Cricsheet registry id in ``external_id``.
+
+    The Cricsheet id is also the STRYK player id, so this is the identity row
+    future providers join against when they bring their own ids.
+    """
+    from sqlalchemy import text
+
+    db.execute(text("""
+        INSERT INTO external_id (entity_type, entity_id, source, external_id)
+        SELECT 'player', p.id, 'cricsheet', p.id FROM player p
+        WHERE NOT EXISTS (SELECT 1 FROM external_id e WHERE e.source = 'cricsheet'
+                          AND e.entity_type = 'player' AND e.external_id = p.id)
+    """))

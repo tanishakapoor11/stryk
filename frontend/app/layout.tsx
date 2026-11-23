@@ -18,7 +18,7 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", displ
 export const metadata: Metadata = {
   title: { default: "Stryk — Cricket Intelligence", template: "%s · Stryk" },
   description:
-    "Look up any IPL player and see what the ball-by-ball data says about them: how they score, when they score, and who they struggle against.",
+    "Ball-by-ball cricket intelligence across franchise leagues, ICC World Cups and women's cricket: look up any player, team or competition and see what the deliveries say.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

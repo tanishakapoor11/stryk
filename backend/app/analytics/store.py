@@ -20,20 +20,59 @@ from typing import List, Optional, Sequence
 import pandas as pd
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.db import engine
 from app.models import (
+    Competition,
+    Country,
+    DataSource,
+    PointsSystem,
+    SourceDataset,
     Delivery,
     Dismissal,
+    Innings,
     Match,
     MatchPlayer,
     Player,
+    Season,
     Team,
+    TournamentStage,
     Venue,
 )
 
 log = logging.getLogger("stryk.store")
 _lock = threading.Lock()
 _cache: Optional["Dataset"] = None
+_scoped: "dict[tuple, Dataset]" = {}
+_SCOPE_CACHE_SIZE = 32
+
+
+class ScopeError(ValueError):
+    """A requested scope would mix records that must never be pooled."""
+
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+@dataclass(frozen=True)
+class Scope:
+    """Which competitions an analysis covers.
+
+    Always a single gender and a single match format: a career record that
+    pooled men's and women's cricket, or T20 and Test cricket, would be
+    meaningless, so a scope that would do so is refused rather than computed.
+    """
+
+    competition_ids: tuple
+    slugs: tuple
+    names: tuple
+    gender: Optional[str]
+    match_type: Optional[str]
+
+    def describe(self) -> dict:
+        return {"competitions": list(self.slugs), "gender": self.gender,
+                "format": self.match_type}
 
 
 @dataclass
@@ -46,6 +85,14 @@ class Dataset:
     squads: pd.DataFrame
     venues: pd.DataFrame
     loaded_at: dt.datetime
+    competitions: pd.DataFrame = field(default_factory=pd.DataFrame)
+    seasons: pd.DataFrame = field(default_factory=pd.DataFrame)
+    stages: pd.DataFrame = field(default_factory=pd.DataFrame)
+    innings: pd.DataFrame = field(default_factory=pd.DataFrame)
+    #: Small reference tables: countries, points_systems, sources, source_datasets.
+    registry: dict = field(default_factory=dict)
+    #: None for the unscoped (whole-database) dataset.
+    scope: Optional[Scope] = None
 
     @property
     def is_empty(self) -> bool:
@@ -165,6 +212,16 @@ def load() -> Dataset:
     teams = _read(select(Team))
     squads = _read(select(MatchPlayer))
     venues = _read(select(Venue))
+    competitions = _read(select(Competition))
+    seasons = _read(select(Season))
+    stages = _read(select(TournamentStage))
+    innings = _read(select(Innings))
+    registry = {
+        "countries": _read(select(Country)),
+        "points_systems": _read(select(PointsSystem)),
+        "sources": _read(select(DataSource)),
+        "source_datasets": _read(select(SourceDataset)),
+    }
 
     if not matches.empty:
         matches["date"] = pd.to_datetime(matches["date"])
@@ -173,7 +230,12 @@ def load() -> Dataset:
     if not deliveries.empty:
         md = matches.set_index("id")
         deliveries["date"] = deliveries["match_id"].map(md["date"])
-        deliveries["match_type"] = deliveries["match_id"].map(md["match_type"])
+        # A handful of distinct values repeated on every ball: as a category this
+        # costs ~0.3 MB instead of ~17 MB per 300k deliveries. It is only ever
+        # filtered on (never grouped by), so category semantics cannot leak.
+        deliveries["match_type"] = deliveries["match_id"].map(md["match_type"]).astype("category")
+        deliveries["competition_id"] = deliveries["match_id"].map(md["competition_id"])
+        deliveries["season_id"] = deliveries["match_id"].map(md["season_id"])
 
     ds = Dataset(
         deliveries=deliveries,
@@ -184,6 +246,11 @@ def load() -> Dataset:
         squads=squads,
         venues=venues.set_index("id") if not venues.empty else venues,
         loaded_at=dt.datetime.utcnow(),
+        competitions=competitions.set_index("id") if not competitions.empty else competitions,
+        seasons=seasons.set_index("id") if not seasons.empty else seasons,
+        stages=stages.set_index("id") if not stages.empty else stages,
+        innings=innings,
+        registry=registry,
     )
     log.info("loaded %s deliveries / %s matches", len(deliveries), len(matches))
     return ds
@@ -222,7 +289,90 @@ def reload() -> Dataset:
     global _cache
     with _lock:
         _cache = load()
+        _scoped.clear()
     return _cache
+
+
+def resolve_scope(ds: Dataset, slugs: Optional[Sequence[str]] = None) -> Scope:
+    """Turn competition slugs (or ids) into a validated :class:`Scope`.
+
+    No slugs means the configured default competition, which keeps every
+    pre-existing URL meaning exactly what it meant when STRYK was IPL-only.
+    """
+    requested = list(slugs) if slugs else [settings.default_competition]
+    comps = ds.competitions
+    if comps.empty:
+        raise ScopeError(503, "No competitions are loaded. Run scripts/migrate.py or an ingest.")
+    by_slug = {str(slug): int(cid) for cid, slug in comps["slug"].items()}
+    ids = []
+    for token in requested:
+        token = str(token).strip().lower()
+        if token in by_slug:
+            ids.append(by_slug[token])
+        elif token.isdigit() and int(token) in comps.index:
+            ids.append(int(token))
+        else:
+            raise ScopeError(404, f"Unknown competition {token!r}")
+    ids = sorted(set(ids))
+    genders = sorted(set(comps.loc[ids, "gender"]))
+    if len(genders) > 1:
+        raise ScopeError(422, "Men's and women's competitions cannot be combined in one analysis.")
+    m = ds.matches[ds.matches["competition_id"].isin(ids)] if not ds.matches.empty else ds.matches
+    formats = sorted(set(m["match_type"])) if not m.empty else []
+    if len(formats) > 1:
+        raise ScopeError(
+            422, f"These competitions span formats {formats}; choose competitions of one format."
+        )
+    return Scope(
+        competition_ids=tuple(ids),
+        slugs=tuple(comps.loc[ids, "slug"]),
+        names=tuple(comps.loc[ids, "name"]),
+        gender=genders[0] if genders else None,
+        match_type=formats[0] if formats else None,
+    )
+
+
+def scoped(scope: Scope, base: Optional[Dataset] = None) -> Dataset:
+    """A view of the dataset restricted to ``scope``'s competitions (cached)."""
+    base = base or get()
+    key = (id(base), scope.competition_ids)
+    hit = _scoped.get(key)
+    if hit is not None:
+        return hit
+    ids = set(scope.competition_ids)
+    matches = base.matches[base.matches["competition_id"].isin(ids)] if not base.matches.empty else base.matches
+    match_ids = set(matches["id"]) if not matches.empty else set()
+    deliveries = (base.deliveries[base.deliveries["competition_id"].isin(ids)]
+                  if not base.deliveries.empty else base.deliveries)
+    innings = set(deliveries["innings_id"]) if not deliveries.empty else set()
+    view = Dataset(
+        deliveries=deliveries,
+        positions=base.positions[base.positions["innings_id"].isin(innings)],
+        matches=matches,
+        # The player registry stays whole so names always resolve; search and
+        # directories are limited to the scope through squads and deliveries.
+        players=base.players,
+        teams=base.teams,
+        squads=base.squads[base.squads["match_id"].isin(match_ids)] if not base.squads.empty else base.squads,
+        venues=base.venues,
+        loaded_at=base.loaded_at,
+        competitions=base.competitions,
+        seasons=base.seasons,
+        stages=base.stages,
+        innings=base.innings[base.innings["match_id"].isin(match_ids)] if not base.innings.empty else base.innings,
+        registry=base.registry,
+        scope=scope,
+    )
+    with _lock:
+        if len(_scoped) >= _SCOPE_CACHE_SIZE:
+            _scoped.pop(next(iter(_scoped)))
+        _scoped[key] = view
+    return view
+
+
+def get_scoped(slugs: Optional[Sequence[str]] = None) -> Dataset:
+    base = get()
+    return scoped(resolve_scope(base, slugs), base)
 
 
 @dataclass
@@ -245,6 +395,9 @@ class Filters:
     date_to: Optional[dt.date] = None
     include_super_over: bool = False
     match_types: Optional[List[str]] = None
+    #: Season row ids. Unlike ``seasons`` (calendar years) these identify a
+    #: competition's season exactly, including ones spanning two years.
+    season_ids: Optional[List[int]] = None
     applied: dict = field(default_factory=dict)
 
     def describe(self) -> dict:
@@ -262,6 +415,7 @@ class Filters:
                 "date_to": self.date_to.isoformat() if self.date_to else None,
                 "include_super_over": self.include_super_over,
                 "match_types": self.match_types,
+                "season_ids": self.season_ids,
             }.items()
             if v not in (None, [], False) or k == "include_super_over"
         }
@@ -278,6 +432,8 @@ def apply(df: pd.DataFrame, f: Filters, team_column: str = "batting_team_id") ->
         mask &= ~df["is_super_over"]
     if f.seasons:
         mask &= df["season"].isin(f.seasons)
+    if f.season_ids:
+        mask &= df["season_id"].isin(f.season_ids)
     if f.match_types:
         mask &= df["match_type"].isin(f.match_types)
     if f.team_ids:

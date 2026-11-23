@@ -38,18 +38,24 @@ def summary(ds: Dataset, f: Filters) -> dict:
     if f.seasons:
         matches = matches[matches["season"].isin(f.seasons)]
     seasons = sorted(matches["season"].unique().tolist())
+    # Counted from the matches in scope, not from registry tables: the people
+    # table also holds officials and players from other competitions.
+    squads = ds.squads[ds.squads["match_id"].isin(matches["id"])] if not ds.squads.empty else ds.squads
+    teams = pd.unique(pd.concat([matches["team1_id"], matches["team2_id"]])) if not matches.empty else []
+    names = list(ds.scope.names) if ds.scope else []
     return {
         "matches": int(matches["id"].nunique()),
         "deliveries": int(len(dv)),
-        "players": int(ds.players.shape[0]),
-        "teams": int(ds.teams.shape[0]),
+        "players": int(squads["player_id"].nunique()) if not squads.empty else 0,
+        "teams": int(len(teams)),
         "seasons": len(seasons),
         "season_range": [seasons[0], seasons[-1]] if seasons else [],
-        "venues": int(ds.venues.shape[0]),
+        "venues": int(matches["venue_id"].dropna().nunique()) if not matches.empty else 0,
         "runs": int(dv["total_runs"].sum()) if not dv.empty else 0,
         "wickets": int(dv["is_wicket"].sum()) if not dv.empty else 0,
         "last_updated": ds.loaded_at.isoformat() + "Z",
-        "source": "Cricsheet ball-by-ball IPL data",
+        "source": "Cricsheet ball-by-ball data" + (f": {', '.join(names)}" if names else ""),
+        "competitions": names,
     }
 
 

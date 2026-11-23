@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     data_dir: Path = ROOT / "data"
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     log_level: str = "INFO"
+    #: Competition used when a request does not name one. Keeps pre-existing
+    #: URLs (all IPL) meaning what they always meant.
+    default_competition: str = "ipl"
 
     @property
     def raw_dir(self) -> Path:

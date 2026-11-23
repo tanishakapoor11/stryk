@@ -1,0 +1,20 @@
+{
+ "_note": "Points and tie-break rules per competition. Only add a system whose rules have been checked against a cited source; a competition with no system shows no standings rather than borrowed T20 rules. Tie-breaker keys: points, wins, net_run_rate, wickets_per_ball. tie_resolution 'super_over' means a tied match is decided by the super-over result (Match.eliminator) and scored as a win/loss; 'shared' awards the tie points to both sides.",
+ "points_systems": [
+  {
+   "slug": "ipl-league",
+   "name": "IPL league stage",
+   "points": {"win": 2, "loss": 0, "tie": 1, "no_result": 1, "abandoned": 1, "draw": null},
+   "tie_resolution": "super_over",
+   "tie_breakers": ["points", "wins", "net_run_rate", "wickets_per_ball"],
+   "standings_stage_type": "league",
+   "qualifiers": 4,
+   "sources": [
+    "https://crictracker.com/cricket-analysis/why-srh-will-finish-below-rr-in-a-16-point-tie-despite-superior-nrr",
+    "https://www.espncricinfo.com/table/series/8048/season/2024/ipl"
+   ],
+   "verified_on": "2026-11-24",
+   "notes": "Teams level on points are separated by most league wins, then net run rate, then wickets taken per legal ball bowled."
+  }
+ ]
+}

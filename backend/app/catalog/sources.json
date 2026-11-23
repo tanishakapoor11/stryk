@@ -1,0 +1,386 @@
+{
+ "sources": [
+  {
+   "slug": "cricsheet",
+   "name": "Cricsheet",
+   "url": "https://cricsheet.org/",
+   "licence": "ODC-By 1.0 (Open Data Commons Attribution License)",
+   "attribution": "Ball-by-ball data from Cricsheet (cricsheet.org), licensed under ODC-By 1.0.",
+   "data_level": 4,
+   "update_frequency": "Continuous; new matches usually within days of being played",
+   "limitations": [
+    "Completed matches only: no upcoming fixtures, live scores or squads announced before a match.",
+    "No player nationality, date of birth or playing role.",
+    "Some matches are withheld from downloads (counts below).",
+    "No wagon-wheel, shot-location or fielding-position data (level 5)."
+   ],
+   "checked_on": "2026-11-24",
+   "datasets": [
+    {
+     "key": "all",
+     "name": "All matches",
+     "matches": 23241,
+     "withheld": 386,
+     "url": "https://cricsheet.org/downloads/all_json.zip"
+    },
+    {
+     "key": "tests",
+     "name": "Test matches",
+     "matches": 923,
+     "withheld": 14,
+     "url": "https://cricsheet.org/downloads/tests_json.zip"
+    },
+    {
+     "key": "mdms",
+     "name": "Multi-day matches",
+     "matches": 2242,
+     "withheld": 6,
+     "url": "https://cricsheet.org/downloads/mdms_json.zip"
+    },
+    {
+     "key": "odis",
+     "name": "One-day internationals",
+     "matches": 3237,
+     "withheld": 162,
+     "url": "https://cricsheet.org/downloads/odis_json.zip"
+    },
+    {
+     "key": "odms",
+     "name": "One-day matches",
+     "matches": 2094,
+     "withheld": 5,
+     "url": "https://cricsheet.org/downloads/odms_json.zip"
+    },
+    {
+     "key": "t20s",
+     "name": "T20 internationals",
+     "matches": 5849,
+     "withheld": 166,
+     "url": "https://cricsheet.org/downloads/t20s_json.zip"
+    },
+    {
+     "key": "it20s",
+     "name": "Non-official T20 internationals",
+     "matches": 320,
+     "withheld": 10,
+     "url": "https://cricsheet.org/downloads/it20s_json.zip"
+    },
+    {
+     "key": "bbl",
+     "name": "Big Bash League",
+     "matches": 662,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/bbl_json.zip"
+    },
+    {
+     "key": "blz",
+     "name": "T20 Blaze",
+     "matches": 17,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/blz_json.zip"
+    },
+    {
+     "key": "bpl",
+     "name": "Bangladesh Premier League",
+     "matches": 469,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/bpl_json.zip"
+    },
+    {
+     "key": "bwt",
+     "name": "Bob Willis Trophy",
+     "matches": 47,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/bwt_json.zip"
+    },
+    {
+     "key": "cch",
+     "name": "County Championship",
+     "matches": 1483,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/cch_json.zip"
+    },
+    {
+     "key": "cec",
+     "name": "Charlotte Edwards Cup",
+     "matches": 124,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/cec_json.zip"
+    },
+    {
+     "key": "cpl",
+     "name": "Caribbean Premier League",
+     "matches": 445,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/cpl_json.zip"
+    },
+    {
+     "key": "ctc",
+     "name": "CSA T20 Challenge",
+     "matches": 314,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/ctc_json.zip"
+    },
+    {
+     "key": "etpl",
+     "name": "European T20 Premier League",
+     "matches": 31,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/etpl_json.zip"
+    },
+    {
+     "key": "frb",
+     "name": "FairBreak Invitational Tournament",
+     "matches": 39,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/frb_json.zip"
+    },
+    {
+     "key": "hnd",
+     "name": "The Hundred",
+     "matches": 389,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/hnd_json.zip"
+    },
+    {
+     "key": "ilt",
+     "name": "International League T20",
+     "matches": 134,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/ilt_json.zip"
+    },
+    {
+     "key": "ipl",
+     "name": "Indian Premier League",
+     "matches": 1243,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/ipl_json.zip"
+    },
+    {
+     "key": "ipo",
+     "name": "Cricket Ireland Inter-Provincial Limited Over Cup",
+     "matches": 90,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/ipo_json.zip"
+    },
+    {
+     "key": "ipt",
+     "name": "Cricket Ireland Inter-Provincial Twenty20 Trophy",
+     "matches": 111,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/ipt_json.zip"
+    },
+    {
+     "key": "lpl",
+     "name": "Lanka Premier League",
+     "matches": 143,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/lpl_json.zip"
+    },
+    {
+     "key": "mcl",
+     "name": "Major Clubs Limited Over Tournament",
+     "matches": 160,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/mcl_json.zip"
+    },
+    {
+     "key": "mct",
+     "name": "Major Clubs T20 Tournament",
+     "matches": 121,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/mct_json.zip"
+    },
+    {
+     "key": "mlc",
+     "name": "Major League Cricket",
+     "matches": 109,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/mlc_json.zip"
+    },
+    {
+     "key": "mlt",
+     "name": "Major League Tournament",
+     "matches": 134,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/mlt_json.zip"
+    },
+    {
+     "key": "msl",
+     "name": "Mzansi Super League",
+     "matches": 56,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/msl_json.zip"
+    },
+    {
+     "key": "npl",
+     "name": "Nepal Premier League",
+     "matches": 76,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/npl_json.zip"
+    },
+    {
+     "key": "ntb",
+     "name": "T20 Blast",
+     "matches": 1570,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/ntb_json.zip"
+    },
+    {
+     "key": "odc",
+     "name": "One-Day Cup (Australia)",
+     "matches": 124,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/odc_json.zip"
+    },
+    {
+     "key": "pks",
+     "name": "Plunket Shield",
+     "matches": 343,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/pks_json.zip"
+    },
+    {
+     "key": "pro20",
+     "name": "CSA Pro20",
+     "matches": 6,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/pro20_json.zip"
+    },
+    {
+     "key": "psl",
+     "name": "Pakistan Super League",
+     "matches": 357,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/psl_json.zip"
+    },
+    {
+     "key": "rhf",
+     "name": "Rachael Heyhoe Flint Trophy",
+     "matches": 189,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/rhf_json.zip"
+    },
+    {
+     "key": "rlc",
+     "name": "One-Day Cup",
+     "matches": 887,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/rlc_json.zip"
+    },
+    {
+     "key": "sat",
+     "name": "SA20",
+     "matches": 130,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/sat_json.zip"
+    },
+    {
+     "key": "sft",
+     "name": "Super 50",
+     "matches": 8,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/sft_json.zip"
+    },
+    {
+     "key": "sma",
+     "name": "Syed Mushtaq Ali Trophy",
+     "matches": 695,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/sma_json.zip"
+    },
+    {
+     "key": "ssh",
+     "name": "Sheffield Shield",
+     "matches": 218,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/ssh_json.zip"
+    },
+    {
+     "key": "ssm",
+     "name": "Super Smash",
+     "matches": 467,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/ssm_json.zip"
+    },
+    {
+     "key": "wbb",
+     "name": "Women's Big Bash League",
+     "matches": 527,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/wbb_json.zip"
+    },
+    {
+     "key": "wcl",
+     "name": "Women's Caribbean Premier League",
+     "matches": 33,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/wcl_json.zip"
+    },
+    {
+     "key": "wod",
+     "name": "ECB Women's One-Day Cup",
+     "matches": 130,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/wod_json.zip"
+    },
+    {
+     "key": "wpl",
+     "name": "Women's Premier League",
+     "matches": 88,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/wpl_json.zip"
+    },
+    {
+     "key": "wsl",
+     "name": "Women's Cricket Super League",
+     "matches": 95,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/wsl_json.zip"
+    },
+    {
+     "key": "wtb",
+     "name": "Women's T20 Blast",
+     "matches": 112,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/wtb_json.zip"
+    },
+    {
+     "key": "wtc",
+     "name": "Women's T20 Challenge",
+     "matches": 13,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/wtc_json.zip"
+    },
+    {
+     "key": "icc_mens_cricket_world_cup",
+     "name": "ICC Men's Cricket World Cup",
+     "matches": 265,
+     "withheld": 24,
+     "url": "https://cricsheet.org/downloads/icc_mens_cricket_world_cup_json.zip"
+    },
+    {
+     "key": "icc_mens_t20_world_cup",
+     "name": "ICC Men's T20 World Cup",
+     "matches": 230,
+     "withheld": 29,
+     "url": "https://cricsheet.org/downloads/icc_mens_t20_world_cup_json.zip"
+    },
+    {
+     "key": "icc_womens_cricket_world_cup",
+     "name": "ICC Women's Cricket World Cup",
+     "matches": 102,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/icc_womens_cricket_world_cup_json.zip"
+    },
+    {
+     "key": "icc_womens_t20_world_cup",
+     "name": "ICC Women's T20 World Cup",
+     "matches": 168,
+     "withheld": 0,
+     "url": "https://cricsheet.org/downloads/icc_womens_t20_world_cup_json.zip"
+    }
+   ]
+  }
+ ]
+}

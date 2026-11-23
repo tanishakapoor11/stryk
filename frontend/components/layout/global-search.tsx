@@ -6,7 +6,7 @@ import { Search, Loader2 } from "lucide-react";
 import { PlayerAvatar } from "@/components/ui/player-identity";
 import type { SearchHit } from "@/types";
 
-/** Global search over players and teams. Debounced, keyboard driven. */
+/** Global search over players, teams and competitions. Debounced, keyboard driven. */
 export function GlobalSearch() {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
@@ -90,9 +90,9 @@ export function GlobalSearch() {
             if (e.key === "Enter" && hits[cursor]) go(hits[cursor]);
             if (e.key === "Escape") setOpen(false);
           }}
-          placeholder="Search any player"
-          aria-label="Search players and teams"
-          className="w-32 bg-transparent text-xs text-ink outline-none placeholder:text-ink-faint sm:w-56"
+          placeholder="Search players, teams, competitions"
+          aria-label="Search players, teams and competitions"
+          className="w-32 bg-transparent text-xs text-ink outline-none placeholder:text-ink-faint sm:w-56 lg:w-32 xl:w-56"
         />
         <kbd className="hidden rounded border border-line px-1 text-2xs text-ink-faint sm:inline">
           ⌘K
@@ -115,6 +115,11 @@ export function GlobalSearch() {
                 }`}
               >
                 {hit.type === "player" ? <PlayerAvatar name={hit.name} size="sm" /> : null}
+                {hit.type === "competition" ? (
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-line-strong text-[9px] text-ink-muted">
+                    CMP
+                  </span>
+                ) : null}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-medium text-ink">{hit.name}</span>
                   {hit.secondary && hit.type === "player" ? (
@@ -133,7 +138,7 @@ export function GlobalSearch() {
       ) : null}
       {open && !loading && query.length >= 2 && hits.length === 0 ? (
         <div className="absolute right-0 top-full z-50 mt-1 w-72 border border-line-strong bg-surface-raised px-3 py-3 text-xs text-ink-muted">
-          No players or teams match “{query}”.
+          No players, teams or competitions match “{query}”.
         </div>
       ) : null}
     </div>

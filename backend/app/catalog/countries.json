@@ -1,0 +1,20 @@
+{
+ "_note": "Cricket countries referenced by the competition catalogue. 'code' is the stable key. 'flag' is an emoji where a single national flag exists; West Indies is a multi-nation team and has none.",
+ "countries": [
+  {"code": "IND", "name": "India", "flag": "🇮🇳", "cricket_board": "Board of Control for Cricket in India"},
+  {"code": "AUS", "name": "Australia", "flag": "🇦🇺", "cricket_board": "Cricket Australia"},
+  {"code": "ENG", "name": "England", "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "cricket_board": "England and Wales Cricket Board"},
+  {"code": "RSA", "name": "South Africa", "flag": "🇿🇦", "cricket_board": "Cricket South Africa"},
+  {"code": "PAK", "name": "Pakistan", "flag": "🇵🇰", "cricket_board": "Pakistan Cricket Board"},
+  {"code": "BAN", "name": "Bangladesh", "flag": "🇧🇩", "cricket_board": "Bangladesh Cricket Board"},
+  {"code": "SL", "name": "Sri Lanka", "flag": "🇱🇰", "cricket_board": "Sri Lanka Cricket"},
+  {"code": "NZ", "name": "New Zealand", "flag": "🇳🇿", "cricket_board": "New Zealand Cricket"},
+  {"code": "WI", "name": "West Indies", "flag": null, "cricket_board": "Cricket West Indies"},
+  {"code": "IRE", "name": "Ireland", "flag": "🇮🇪", "cricket_board": "Cricket Ireland"},
+  {"code": "NEP", "name": "Nepal", "flag": "🇳🇵", "cricket_board": "Cricket Association of Nepal"},
+  {"code": "USA", "name": "United States", "flag": "🇺🇸", "cricket_board": "USA Cricket"},
+  {"code": "UAE", "name": "United Arab Emirates", "flag": "🇦🇪", "cricket_board": "Emirates Cricket Board"},
+  {"code": "AFG", "name": "Afghanistan", "flag": "🇦🇫", "cricket_board": "Afghanistan Cricket Board"},
+  {"code": "ZIM", "name": "Zimbabwe", "flag": "🇿🇼", "cricket_board": "Zimbabwe Cricket"}
+ ]
+}

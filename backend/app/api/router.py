@@ -14,6 +14,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.analytics import auction as auction_service
+from app.analytics import competitions as competition_service
 from app.analytics import matchups as matchup_service
 from app.analytics import names as name_service
 from app.analytics import overview as overview_service
@@ -21,48 +22,73 @@ from app.analytics import players as player_service
 from app.analytics import store
 from app.analytics import teams as team_service
 from app.analytics.constants import METRIC_DEFINITIONS, PHASE_DEFINITIONS, PHASE_ORDER, QUALIFICATION
-from app.api.deps import filter_params
-from app.analytics.store import Filters
+from app.api.deps import filter_params, scope_params
+from app.analytics.store import Filters, ScopeError
 
 router = APIRouter(prefix="/api")
 
 
-def _ds():
+NO_DATA = "No data has been ingested yet. Run scripts/fetch_cricsheet.py then scripts/ingest.py."
+
+
+def _base():
+    """The whole database: for discovery, search and catalogue views."""
     ds = store.get()
-    if ds.is_empty:
-        raise HTTPException(
-            503,
-            "No data has been ingested yet. Run scripts/fetch_cricsheet.py then scripts/ingest.py.",
-        )
+    if ds.competitions.empty and ds.is_empty:
+        raise HTTPException(503, NO_DATA)
     return ds
+
+
+def _ds(competition: Optional[List[str]] = None):
+    """A dataset scoped to one competition set (default: the default competition).
+
+    Every statistical endpoint goes through here, so no analysis can pool
+    deliveries across competitions of different genders or formats.
+    """
+    base = store.get()
+    if base.is_empty:
+        raise HTTPException(503, NO_DATA)
+    try:
+        return store.scoped(store.resolve_scope(base, competition), base)
+    except ScopeError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+def _entity_scope(competition, *, player_id=None, team_id=None):
+    """Explicit scope if given; otherwise the entity's busiest competition."""
+    if competition:
+        return competition, None
+    options = competition_service.entity_competitions(store.get(), player_id=player_id, team_id=team_id)
+    return ([options[0]["slug"]] if options else None), options
 
 
 # ---------------------------------------------------------------- meta
 @router.get("/meta/seasons", tags=["meta"])
-def seasons():
-    ds = _ds()
+def seasons(competition: Optional[List[str]] = Depends(scope_params)):
+    ds = _ds(competition)
     rows = ds.matches.groupby("season").agg(matches=("id", "nunique")).reset_index()
     return [{"season": int(r.season), "matches": int(r.matches)} for r in rows.itertuples()]
 
 
 @router.get("/meta/teams", tags=["meta"])
-def teams():
-    return team_service.list_teams(_ds())
+def teams(competition: Optional[List[str]] = Depends(scope_params)):
+    return team_service.list_teams(_ds(competition))
 
 
 @router.get("/meta/venues", tags=["meta"])
-def venues():
-    ds = _ds()
+def venues(competition: Optional[List[str]] = Depends(scope_params)):
+    ds = _ds(competition)
     counts = ds.matches.groupby("venue_id").size()
     return [
         {"id": int(vid), "name": row["name"], "city": row["city"],
          "matches": int(counts.get(vid, 0))}
         for vid, row in ds.venues.iterrows()
+        if counts.get(vid, 0)
     ]
 
 
 @router.get("/meta/metrics", tags=["meta"])
-def metric_definitions():
+def metric_definitions(competition: Optional[List[str]] = Depends(scope_params)):
     """Formulas and qualification thresholds, served to the UI tooltips."""
     return {
         "metrics": METRIC_DEFINITIONS,
@@ -71,7 +97,7 @@ def metric_definitions():
         "data_availability": {
             "bowling_style_splits": player_service.BOWLING_STYLE_DATA_AVAILABLE,
             "overseas_status": team_service.OVERSEAS_DATA_AVAILABLE,
-            "auction_prices": auction_service.load_prices(_ds()) is not None,
+            "auction_prices": auction_service.load_prices(_ds(competition)) is not None,
         },
     }
 
@@ -85,7 +111,7 @@ def global_search(q: str = Query(..., min_length=2), limit: int = Query(12, le=5
     by appearances, so the player a reader almost certainly meant comes first.
     See app/analytics/names.py.
     """
-    ds = _ds()
+    ds = _base()
     ql = name_service.normalise(q)
     out = [
         {
@@ -104,14 +130,23 @@ def global_search(q: str = Query(..., min_length=2), limit: int = Query(12, le=5
             out.append({"type": "team", "id": t["id"], "name": t["name"],
                         "secondary": t["short_name"], "detail": f"{t['matches']} matches",
                         "href": f"/teams/{t['id']}"})
-    return out[: limit + 6]
+    for c in competition_service.directory(ds, q=q, limit=6)["items"]:
+        out.append({"type": "competition", "id": c["slug"], "name": c["name"],
+                    "secondary": c["short_name"], "detail": c["coverage"]["label"],
+                    "href": f"/competitions/{c['slug']}"})
+    return out[: limit + 12]
 
 
 # ---------------------------------------------------------------- overview
 @router.get("/overview", tags=["overview"])
-def overview(f: Filters = Depends(filter_params), limit: int = Query(10, ge=3, le=50)):
-    ds = _ds()
+def overview(
+    f: Filters = Depends(filter_params),
+    limit: int = Query(10, ge=3, le=50),
+    competition: Optional[List[str]] = Depends(scope_params),
+):
+    ds = _ds(competition)
     return {
+        "scope": ds.scope.describe(),
         "summary": overview_service.summary(ds, f),
         "leaderboards": overview_service.leaderboards(ds, f, limit),
         "trends": overview_service.season_trends(ds, f),
@@ -123,8 +158,12 @@ def overview(f: Filters = Depends(filter_params), limit: int = Query(10, ge=3, l
 
 
 @router.get("/insights", tags=["overview"])
-def insights(f: Filters = Depends(filter_params), count: int = Query(4, ge=1, le=10)):
-    return overview_service.insights(_ds(), f, count)
+def insights(
+    f: Filters = Depends(filter_params),
+    count: int = Query(4, ge=1, le=10),
+    competition: Optional[List[str]] = Depends(scope_params),
+):
+    return overview_service.insights(_ds(competition), f, count)
 
 
 # ---------------------------------------------------------------- players
@@ -137,17 +176,36 @@ def list_players(
     order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    competition: Optional[List[str]] = Depends(scope_params),
 ):
-    return player_service.directory(
-        _ds(), f, search=q, role=role, sort=sort, order=order, limit=limit, offset=offset
+    ds = _ds(competition)
+    result = player_service.directory(
+        ds, f, search=q, role=role, sort=sort, order=order, limit=limit, offset=offset
     )
+    result["scope"] = ds.scope.describe()
+    return result
 
 
 @router.get("/players/{player_id}", tags=["players"])
-def player_profile(player_id: str, f: Filters = Depends(filter_params)):
-    result = player_service.profile(_ds(), player_id, f)
+def player_profile(
+    player_id: str,
+    f: Filters = Depends(filter_params),
+    competition: Optional[List[str]] = Depends(scope_params),
+):
+    """A player's record within one competition scope.
+
+    Without ``competition`` the scope is the competition the player has played
+    most in, and ``competitions`` lists every other one so the UI can switch.
+    Records are never pooled across competitions of different gender or format.
+    """
+    scope, options = _entity_scope(competition, player_id=player_id)
+    ds = _ds(scope)
+    result = player_service.profile(ds, player_id, f)
     if result is None:
         raise HTTPException(404, f"No player with id {player_id!r}")
+    result["scope"] = ds.scope.describe()
+    result["competitions"] = options if options is not None else competition_service.entity_competitions(
+        store.get(), player_id=player_id)
     return result
 
 
@@ -157,8 +215,9 @@ def player_matchups(
     as_role: str = Query("batter", pattern="^(batter|bowler)$"),
     f: Filters = Depends(filter_params),
     limit: int = Query(15, ge=1, le=60),
+    competition: Optional[List[str]] = Depends(scope_params),
 ):
-    ds = _ds()
+    ds = _ds(_entity_scope(competition, player_id=player_id)[0])
     if player_id not in ds.players.index:
         raise HTTPException(404, f"No player with id {player_id!r}")
     return matchup_service.frequent_opponents(ds, player_id, as_role, f, limit)
@@ -168,17 +227,18 @@ def player_matchups(
 def compare(
     players: List[str] = Query(..., alias="player", min_length=1),
     f: Filters = Depends(filter_params),
+    competition: Optional[List[str]] = Depends(scope_params),
 ):
-    """Side-by-side profiles. The UI decides what is meaningful; the API never
-    declares a winner."""
-    ds = _ds()
+    """Side-by-side profiles on an identical sample. The UI decides what is
+    meaningful; the API never declares a winner."""
+    ds = _ds(competition)
     out = []
     for pid in players[:4]:
         profile = player_service.profile(ds, pid, f)
         if profile is None:
             raise HTTPException(404, f"No player with id {pid!r}")
         out.append(profile)
-    return {"players": out, "filters": f.describe()}
+    return {"players": out, "filters": f.describe(), "scope": ds.scope.describe()}
 
 
 # ---------------------------------------------------------------- matchups
@@ -187,8 +247,9 @@ def matchup(
     batter: str = Query(...),
     bowler: str = Query(...),
     f: Filters = Depends(filter_params),
+    competition: Optional[List[str]] = Depends(scope_params),
 ):
-    result = matchup_service.head_to_head(_ds(), batter, bowler, f)
+    result = matchup_service.head_to_head(_ds(competition), batter, bowler, f)
     if result is None:
         raise HTTPException(404, "Unknown batter or bowler id")
     return result
@@ -196,15 +257,24 @@ def matchup(
 
 # ---------------------------------------------------------------- teams
 @router.get("/teams", tags=["teams"])
-def team_index():
-    return team_service.list_teams(_ds())
+def team_index(competition: Optional[List[str]] = Depends(scope_params)):
+    return team_service.list_teams(_ds(competition))
 
 
 @router.get("/teams/{team_id}", tags=["teams"])
-def team_profile(team_id: int, f: Filters = Depends(filter_params)):
-    result = team_service.profile(_ds(), team_id, f)
+def team_profile(
+    team_id: int,
+    f: Filters = Depends(filter_params),
+    competition: Optional[List[str]] = Depends(scope_params),
+):
+    scope, options = _entity_scope(competition, team_id=team_id)
+    ds = _ds(scope)
+    result = team_service.profile(ds, team_id, f)
     if result is None:
         raise HTTPException(404, f"No team with id {team_id}")
+    result["scope"] = ds.scope.describe()
+    result["competitions"] = options if options is not None else competition_service.entity_competitions(
+        store.get(), team_id=team_id)
     return result
 
 
@@ -216,6 +286,7 @@ def auction_pool(
     role: Optional[str] = Query(None, description="Batter | Bowler | All-rounder"),
     sort: str = Query("batting_impact"),
     limit: int = Query(60, ge=1, le=200),
+    competition: Optional[List[str]] = Depends(scope_params),
 ):
     """Candidate pool scored against the league rate for the same deliveries.
 
@@ -223,9 +294,105 @@ def auction_pool(
     are not valuations. Price data, when the response says it is available,
     comes from an operator-supplied file and never from a model.
     """
-    result = auction_service.pool(_ds(), f, role=role, search=q, sort=sort, limit=limit)
+    result = auction_service.pool(_ds(competition), f, role=role, search=q, sort=sort, limit=limit)
     result["requirements"] = auction_service.squad_requirements()
     return result
+
+
+# ---------------------------------------------------------- competitions
+def _competition_id(key: str) -> int:
+    cid = competition_service.find(_base(), key)
+    if cid is None:
+        raise HTTPException(404, f"No competition {key!r}")
+    return cid
+
+
+def _season_id(cid: int, key: str) -> int:
+    sid = competition_service.find_season(_base(), cid, key)
+    if sid is None:
+        raise HTTPException(404, f"No season {key!r} in this competition")
+    return sid
+
+
+@router.get("/summary", tags=["competitions"])
+def global_summary(recent: int = Query(10, ge=1, le=50)):
+    """How much cricket STRYK holds, across every competition (home page)."""
+    return competition_service.global_summary(_base(), recent)
+
+
+@router.get("/countries", tags=["competitions"])
+def countries():
+    return competition_service.countries(_base())
+
+
+@router.get("/sources", tags=["competitions"])
+def sources():
+    """The source coverage registry: licences, update frequency, datasets."""
+    return competition_service.sources(_base())
+
+
+@router.get("/competitions", tags=["competitions"])
+def competitions(
+    q: Optional[str] = Query(None, description="Name, country or governing body"),
+    type: Optional[List[str]] = Query(None, description="INTERNATIONAL, ICC_TOURNAMENT, DOMESTIC, FRANCHISE_LEAGUE, REGIONAL, OTHER"),
+    gender: Optional[str] = Query(None, pattern="^(MEN|WOMEN|MIXED|UNKNOWN)$"),
+    country: Optional[str] = Query(None, description="Country code, e.g. IND"),
+    format: Optional[str] = Query(None, description="T20, ODI, Test, ..."),
+    season_status: Optional[str] = Query(None, pattern="^(upcoming|in_progress|completed|unknown)$"),
+    coverage: Optional[List[str]] = Query(None, description="Coverage status, e.g. ball_by_ball"),
+    season: Optional[int] = Query(None, description="Has a season starting in this year"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    return competition_service.directory(
+        _base(), q=q, types=type, gender=gender, country=country, fmt=format,
+        season_status=season_status, coverage_status=coverage, season_year=season,
+        limit=limit, offset=offset,
+    )
+
+
+@router.get("/competitions/{key}", tags=["competitions"])
+def competition_detail(key: str):
+    return competition_service.competition(_base(), _competition_id(key))
+
+
+@router.get("/competitions/{key}/seasons", tags=["competitions"])
+def competition_seasons(key: str):
+    return competition_service.competition(_base(), _competition_id(key))["seasons"]
+
+
+@router.get("/competitions/{key}/seasons/{season}", tags=["competitions"])
+def season_detail(key: str, season: str):
+    cid = _competition_id(key)
+    return competition_service.season(_base(), cid, _season_id(cid, season))
+
+
+@router.get("/competitions/{key}/seasons/{season}/standings", tags=["competitions"])
+def season_standings(key: str, season: str):
+    cid = _competition_id(key)
+    return competition_service.season(_base(), cid, _season_id(cid, season))["standings"]
+
+
+@router.get("/competitions/{key}/seasons/{season}/fixtures", tags=["competitions"])
+def season_fixtures(key: str, season: str):
+    cid = _competition_id(key)
+    _season_id(cid, season)
+    return {"available": False, "reason": competition_service.FIXTURES_UNAVAILABLE, "items": []}
+
+
+@router.get("/competitions/{key}/seasons/{season}/results", tags=["competitions"])
+def season_results(
+    key: str, season: str,
+    limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0),
+):
+    cid = _competition_id(key)
+    return competition_service.results(_base(), cid, _season_id(cid, season), limit, offset)
+
+
+@router.get("/competitions/{key}/seasons/{season}/statistics", tags=["competitions"])
+def season_statistics(key: str, season: str, limit: int = Query(10, ge=3, le=50)):
+    cid = _competition_id(key)
+    return competition_service.statistics(_base(), cid, _season_id(cid, season), limit)
 
 
 # ---------------------------------------------------------------- admin

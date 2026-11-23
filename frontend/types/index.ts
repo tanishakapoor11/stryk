@@ -68,6 +68,8 @@ export interface Summary {
   wickets: number;
   last_updated: string;
   source: string;
+  /** Names of the competitions this summary covers. */
+  competitions?: string[];
 }
 
 export interface Insight {
@@ -113,6 +115,7 @@ export interface QualifiedBoard {
 }
 
 export interface OverviewPayload {
+  scope?: Scope;
   summary: Summary;
   leaderboards: {
     most_runs: BattingLine[];
@@ -170,6 +173,10 @@ export interface PlayerDirectory {
 }
 
 export interface PlayerProfile {
+  /** The competition scope this profile was computed over. */
+  scope?: Scope;
+  /** Every competition the player has appeared in, busiest first. */
+  competitions?: EntityCompetition[];
   player: {
     id: string;
     name: string;
@@ -259,6 +266,8 @@ export interface TeamSummary {
 }
 
 export interface TeamProfile {
+  scope?: Scope;
+  competitions?: EntityCompetition[];
   team: { id: number; name: string; short_name: Nullable<string>; aliases: string[] };
   filters: Record<string, unknown>;
   record: { played: number; won: number; lost: number; no_result: number; win_pct: Nullable<number> };
@@ -292,7 +301,7 @@ export interface TeamProfile {
 
 export interface SeasonMeta { season: number; matches: number }
 export interface SearchHit {
-  type: "player" | "team";
+  type: "player" | "team" | "competition";
   id: string | number;
   name: string;
   /** Scorecard name for a player, short name for a team. */
@@ -393,4 +402,240 @@ export interface OverProfile {
   runs_conceded: number;
   economy: Nullable<number>;
   wickets: number;
+}
+
+/* ------------------------------------------------------------------ *
+ * Competitions (global platform, Phase 1). Mirrors
+ * backend/app/analytics/competitions.py.
+ * ------------------------------------------------------------------ */
+export type CompetitionType =
+  | "INTERNATIONAL"
+  | "ICC_TOURNAMENT"
+  | "DOMESTIC"
+  | "FRANCHISE_LEAGUE"
+  | "REGIONAL"
+  | "OTHER";
+export type Gender = "MEN" | "WOMEN" | "MIXED" | "UNKNOWN";
+export type CoverageStatus =
+  | "ball_by_ball"
+  | "detailed"
+  | "scorecard"
+  | "results"
+  | "metadata"
+  | "mixed"
+  | "not_ingested"
+  | "unavailable";
+export type SeasonStatus = "upcoming" | "in_progress" | "completed" | "unknown";
+
+export interface Scope {
+  competitions: string[];
+  gender: Nullable<Gender>;
+  format: Nullable<string>;
+}
+
+export interface CountryRef {
+  id: number;
+  code: string;
+  name: string;
+  flag: Nullable<string>;
+  cricket_board: Nullable<string>;
+}
+
+export interface SourceDatasetRef {
+  source: string;
+  dataset: string;
+  name: string;
+  url: string;
+  published_matches: Nullable<number>;
+  gender_filter: Nullable<Gender>;
+  checked_on: Nullable<string>;
+}
+
+export interface Coverage {
+  status: CoverageStatus;
+  label: string;
+  detail: Nullable<string>;
+  matches: number;
+  seasons: number;
+  first_match?: string;
+  last_match?: string;
+  data_levels: number[];
+  sources: SourceDatasetRef[];
+}
+
+export interface SeasonSummary {
+  id: number;
+  name: string;
+  year: number;
+  status: SeasonStatus;
+  format: Nullable<string>;
+  start_date: Nullable<string>;
+  end_date: Nullable<string>;
+  matches: number;
+}
+
+export interface CompetitionCard {
+  id: number;
+  slug: string;
+  name: string;
+  short_name: Nullable<string>;
+  type: CompetitionType;
+  gender: Gender;
+  country: Nullable<CountryRef>;
+  governing_body: Nullable<string>;
+  description: Nullable<string>;
+  formats: string[];
+  is_active: boolean;
+  is_catalogued: boolean;
+  has_points_system: boolean;
+  latest_season: Nullable<SeasonSummary>;
+  coverage: Coverage;
+}
+
+export interface CompetitionDirectory {
+  total: number;
+  items: CompetitionCard[];
+  limit: number;
+  offset: number;
+  facets: Record<"type" | "gender" | "country" | "format" | "coverage", Record<string, number>>;
+}
+
+export interface PointsSystemSummary {
+  slug: string;
+  name: string;
+  points: Record<string, number | null>;
+  tie_breakers: string[];
+  tie_resolution: "super_over" | "shared";
+  qualifiers: Nullable<number>;
+  sources: string[];
+  verified_on: Nullable<string>;
+  notes: Nullable<string>;
+}
+
+export interface TeamRef {
+  id: number;
+  name: string;
+  short_name: Nullable<string>;
+}
+
+export interface MatchRow {
+  id: string;
+  /** Present on cross-competition lists (home page). */
+  competition?: { slug: string; name: string; short_name: Nullable<string> };
+  date: string;
+  match_number: Nullable<number>;
+  stage: Nullable<string>;
+  stage_type: Nullable<"league" | "group" | "knockout">;
+  format: string;
+  team1: TeamRef;
+  team2: TeamRef;
+  winner_id: Nullable<number>;
+  result: string;
+  status: string;
+  venue: Nullable<{ name: string; city: Nullable<string> }>;
+  data_level: Nullable<number>;
+}
+
+export interface SeasonTeam extends TeamRef {
+  played: number;
+  won: number;
+}
+
+export interface CompetitionDetail extends CompetitionCard {
+  seasons: SeasonSummary[];
+  points_system: Nullable<PointsSystemSummary>;
+  unavailable_reason: Nullable<string>;
+  fixtures: { available: boolean; reason: string };
+  current_season: Nullable<SeasonSummary>;
+  teams: SeasonTeam[];
+  recent_results: MatchRow[];
+  leaders: Nullable<OverviewPayload["leaderboards"]>;
+  scope?: Scope;
+}
+
+export interface StandingsRow {
+  position: number;
+  team_id: number;
+  name: string;
+  short_name: Nullable<string>;
+  played: number;
+  won: number;
+  lost: number;
+  tied: number;
+  drawn: number;
+  no_result: number;
+  points: number;
+  net_run_rate: Nullable<number>;
+  runs_for: number;
+  overs_for: Nullable<string>;
+  runs_against: number;
+  overs_against: Nullable<string>;
+  reached_knockouts: boolean;
+}
+
+export type Standings =
+  | { available: false; reason: string }
+  | {
+      available: true;
+      complete: boolean;
+      warnings: string[];
+      matches_counted: number;
+      points_system: PointsSystemSummary;
+      groups: { group: Nullable<string>; rows: StandingsRow[]; played_counts: number[] }[];
+    };
+
+export interface SeasonDetail {
+  competition: CompetitionCard;
+  season: SeasonSummary;
+  stages: { id: number; name: string; type: "league" | "group" | "knockout"; matches: number }[];
+  teams: SeasonTeam[];
+  standings: Standings;
+  knockouts: MatchRow[];
+  leaders: Nullable<OverviewPayload["leaderboards"]>;
+  fixtures: { available: boolean; reason: string };
+  coverage: { status: CoverageStatus; label: string; matches: number; data_levels?: number[] };
+  scope?: Scope;
+}
+
+export interface Paged<T> {
+  total: number;
+  items: T[];
+  limit: number;
+  offset: number;
+}
+
+/** A competition a player or team has appeared in, for the profile switcher. */
+export interface EntityCompetition {
+  id: number;
+  slug: string;
+  name: string;
+  short_name: Nullable<string>;
+  gender: Gender;
+  type: CompetitionType;
+  format: string;
+  matches: number;
+  first_match: string;
+  last_match: string;
+}
+
+export interface GlobalSummary {
+  competitions: {
+    catalogued: number;
+    with_data: number;
+    women_with_data: number;
+    women_catalogued: number;
+    by_type: Partial<Record<CompetitionType, { catalogued: number; with_data: number }>>;
+  };
+  matches: number;
+  matches_by_gender: Partial<Record<Gender, number>>;
+  deliveries: number;
+  players: number;
+  teams: number;
+  formats: string[];
+  first_match: Nullable<string>;
+  last_match: Nullable<string>;
+  with_data: CompetitionCard[];
+  latest_results: MatchRow[];
+  /** Leading run-scorer of each of the busiest competitions: search starters. */
+  suggestions: { id: string; name: string; competition: string }[];
 }

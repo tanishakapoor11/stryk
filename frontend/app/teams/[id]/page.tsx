@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { api, apiOrNull, ApiError } from "@/lib/api";
+import { CompetitionSwitcher } from "@/components/competitions/competition-switcher";
 import { filterQuery, describeFilters, type RawParams } from "@/lib/search-params";
 import { Section } from "@/components/layout/page-header";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
@@ -54,10 +55,9 @@ export default async function TeamPage({
   let profile: TeamProfile | null;
   let seasons: SeasonMeta[];
   try {
-    [profile, seasons] = await Promise.all([
-      apiOrNull<TeamProfile>(`/api/teams/${params.id}`, filterQuery(searchParams)),
-      api<SeasonMeta[]>("/api/meta/seasons"),
-    ]);
+    profile = await apiOrNull<TeamProfile>(`/api/teams/${params.id}`, filterQuery(searchParams));
+    // Seasons of the competition this profile shows (the team's busiest unless the URL names one).
+    seasons = await api<SeasonMeta[]>("/api/meta/seasons", { competition: profile?.scope?.competitions });
   } catch (err) {
     const e = err as ApiError;
     return (
@@ -96,7 +96,9 @@ export default async function TeamPage({
             items={[
               { label: "Stryk", href: "/" },
               { label: "Teams", href: "/teams" },
-              { label: identity.short },
+              // Identity colours exist only for teams in lib/teams.ts; everyone
+              // else falls back to their own short name, never a placeholder.
+              { label: identity.short !== "—" ? identity.short : profile.team.short_name ?? profile.team.name },
             ]}
           />
           <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-4">
@@ -121,6 +123,15 @@ export default async function TeamPage({
                   : ""}
                 Showing {describeFilters(searchParams)}.
               </p>
+              {profile.competitions?.length ? (
+                <div className="mt-2">
+                  <CompetitionSwitcher
+                    options={profile.competitions}
+                    current={profile.scope?.competitions[0]}
+                    basePath={`/teams/${params.id}`}
+                  />
+                </div>
+              ) : null}
             </div>
             <div className="ml-auto flex gap-5">
               {[

@@ -22,7 +22,8 @@ python scripts/ingest.py                 # add --limit 50 for a fast smoke impor
 python scripts/fetch_player_names.py     # required for name search: "SS Iyer" -> "Shreyas Iyer"
 python scripts/fetch_player_photos.py    # optional: freely licensed portraits
 
-# 3. API on :8000
+# 3. API on :8000 (ingest migrates the schema; after pulling changes, run
+#    python scripts/migrate.py to upgrade an existing database in place)
 cd backend && uvicorn app.main:app --reload
 
 # If the API was already running while step 2 ran, it is still serving the old data:
@@ -38,6 +39,14 @@ Open <http://localhost:3000>. The frontend reads `API_URL` from `frontend/.env.l
 Tests: `cd backend && python -m pytest`
 
 **Gotchas on a fresh setup**
+
+- **After pulling schema changes, run `python scripts/migrate.py`.** The API reads the
+  new columns as soon as its code reloads, so an un-migrated database fails every
+  request with "Internal error computing this analysis". The migration keeps every
+  row; back up first with `sqlite3 data/processed/stryk.db ".backup stryk-backup.db"`
+  if you want a restore point.
+- **The dev server can miss newly added routes.** If a page that exists in `app/`
+  returns "There is no page at this address", restart `npm run dev`.
 
 - **Skip `fetch_player_names.py` and search only knows scorecard names.** `Shreyas`
   finds nothing; only `SS Iyer` does, and Prabhsimran Singh shows as `P Simran Singh`.
@@ -405,12 +414,23 @@ exist to make a two-season player comparable to a ten-season one.
 | `GET /api/teams`, `/api/teams/{id}` | Team index and profile. |
 | `GET /api/auction/pool` | Scored candidate pool and squad requirements. |
 | `GET /api/meta/seasons\|teams\|venues\|metrics` | Filter vocabulary and metric definitions. |
-| `GET /api/search?q=` | Players and teams. |
+| `GET /api/search?q=` | Players, teams and competitions. |
+| `GET /api/competitions` | Directory: `q`, `type`, `gender`, `country`, `format`, `season_status`, `coverage`, `season`, `limit`, `offset`. |
+| `GET /api/competitions/{slug}` | Identity, coverage, seasons, current season teams, recent results, leaders. |
+| `GET /api/competitions/{slug}/seasons[/{season}]` | Season list, or one season: stages, standings, knockouts, leaders. |
+| `GET /api/competitions/{slug}/seasons/{season}/standings\|results\|fixtures\|statistics` | Each part on its own. Season `2023/24` is written `2023-24` in URLs. |
+| `GET /api/countries`, `GET /api/sources` | Countries, and the source coverage registry (licence, datasets, counts). |
 | `POST /api/admin/reload` | Re-read the fact table after an ingestion run. |
 
-Every analytical endpoint accepts the same filters: `season` (repeatable), `team`,
-`opposition`, `venue`, `phase` (repeatable), `innings`, `chasing`, `date_from`,
+Every analytical endpoint accepts the same filters: `season` (repeatable), `season_id`,
+`team`, `opposition`, `venue`, `phase` (repeatable), `innings`, `chasing`, `date_from`,
 `date_to`, `include_super_over`. Interactive docs at <http://localhost:8000/docs>.
+
+Every analytical endpoint is also **scoped to competitions** with `competition`
+(repeatable slug). Without it the scope is `STRYK_DEFAULT_COMPETITION` (default `ipl`),
+so older links mean what they always did; player and team profiles default to the
+competition that player or team has played most in and list the others. Competitions of
+different genders or formats are refused with a 422 rather than pooled into one record.
 
 ---
 
@@ -427,3 +447,19 @@ curl -X POST http://127.0.0.1:8000/api/admin/reload
 Ingestion is idempotent on the Cricsheet match id, so re-running over the full
 directory never duplicates a match. `--reset` drops and rebuilds. Validation warnings
 are printed at the end of each run.
+
+**Another competition** is a catalogue entry plus an import; no page or endpoint is
+written for it. 53 competitions are already catalogued in `backend/app/catalog/` with the
+Cricsheet dataset that holds each, so most need only:
+
+```bash
+python scripts/fetch_cricsheet.py wpl          # any key in backend/app/catalog/sources.json
+python scripts/ingest.py --dataset wpl
+curl -X POST http://127.0.0.1:8000/api/admin/reload
+```
+
+It then appears in the directory with coverage, seasons, results and leaders. A points
+table appears only if `points_systems.json` has rules for it, checked against a cited
+source; until then the season page says no table is configured rather than borrowing
+another competition's rules. See [docs/global-platform.md](docs/global-platform.md) for
+the model, coverage levels and phase plan.

@@ -81,7 +81,10 @@ def index(ds: Dataset) -> pd.DataFrame:
         frame["appearances"] = counts.reindex(frame.index).fillna(0).astype(int)
     else:
         frame["appearances"] = 0
-    return frame
+    # Only people who played in the scope are searchable as players. The
+    # registry also holds match officials and, once other competitions are
+    # ingested, players who never appeared in this one.
+    return frame[frame["appearances"] > 0]
 
 
 def _token_matches(token: str, row: pd.Series, as_initial: bool = False) -> bool:

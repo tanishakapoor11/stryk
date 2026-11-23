@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api, apiOrNull, ApiError } from "@/lib/api";
+import { CompetitionSwitcher } from "@/components/competitions/competition-switcher";
 import { filterQuery, type RawParams } from "@/lib/search-params";
 import { Hint } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -65,15 +66,17 @@ export default async function PlayerPage({
   let seasons: SeasonMeta[];
   let topBowlers: MatchupOpponent[] = [];
   try {
-    [p, seasons, topBowlers] = await Promise.all([
+    [p, topBowlers] = await Promise.all([
       apiOrNull<PlayerProfile>(`/api/players/${params.id}`, filterQuery(searchParams)),
-      api<SeasonMeta[]>("/api/meta/seasons"),
       api<MatchupOpponent[]>(`/api/players/${params.id}/matchups`, {
         ...filterQuery(searchParams),
         as_role: "batter",
         limit: 10,
       }).catch(() => []),
     ]);
+    // Season choices come from the competition this profile is showing, which
+    // the API picks (the player's busiest) when the URL does not name one.
+    seasons = await api<SeasonMeta[]>("/api/meta/seasons", { competition: p?.scope?.competitions });
   } catch (err) {
     const e = err as ApiError;
     return (
@@ -106,6 +109,15 @@ export default async function PlayerPage({
           <div className="mt-3">
             <PlayerCard profile={p} />
           </div>
+          {p.competitions?.length ? (
+            <div className="mt-3">
+              <CompetitionSwitcher
+                options={p.competitions}
+                current={p.scope?.competitions[0]}
+                basePath={`/players/${params.id}`}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
       <FilterBar seasons={seasons} />

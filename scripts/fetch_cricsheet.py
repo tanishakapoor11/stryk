@@ -1,6 +1,7 @@
 """Download and extract a Cricsheet JSON dataset into data/raw/<name>/.
 
-Usage: python scripts/fetch_cricsheet.py [dataset]   (default: ipl)
+Usage: python scripts/fetch_cricsheet.py [dataset]   (default: ipl; any key in
+backend/app/catalog/sources.json, e.g. wpl, bbl, t20s)
 
 Cricsheet publishes one zip of per-match JSON files per competition.
 Downloaded archives are untrusted input: each dataset is extracted into its
@@ -14,13 +15,17 @@ import zipfile
 from pathlib import Path
 from urllib.request import urlopen
 
-DATASETS = {
-    "ipl": "https://cricsheet.org/downloads/ipl_json.zip",
-    "t20s": "https://cricsheet.org/downloads/t20s_json.zip",
-    "odis": "https://cricsheet.org/downloads/odis_json.zip",
-    "tests": "https://cricsheet.org/downloads/tests_json.zip",
-}
+import json
+
 ROOT = Path(__file__).resolve().parents[1]
+# Every dataset Cricsheet publishes, from the source registry, so a new
+# competition needs a catalogue entry rather than an edit here.
+_SOURCES = json.loads((ROOT / "backend" / "app" / "catalog" / "sources.json").read_text())
+DATASETS = {
+    d["key"]: d["url"]
+    for s in _SOURCES["sources"] if s["slug"] == "cricsheet"
+    for d in s["datasets"]
+}
 
 
 def fetch(name: str) -> Path:

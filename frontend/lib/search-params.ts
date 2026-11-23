@@ -25,6 +25,9 @@ export function numbers(params: RawParams, key: string): number[] {
 /** The filter parameters every analytics endpoint understands. */
 export function filterQuery(params: RawParams) {
   return {
+    // Competition scope travels with every analysis link; absent means the
+    // API's default competition, so pre-existing URLs keep their meaning.
+    competition: many(params, "competition"),
     season: numbers(params, "season"),
     team: numbers(params, "team"),
     phase: many(params, "phase"),

@@ -15,6 +15,10 @@ from typing import Dict, List, Tuple
 PHASE_DEFINITIONS: Dict[str, List[Tuple[str, int, int]]] = {
     "T20": [("powerplay", 1, 6), ("middle", 7, 15), ("death", 16, 10_000)],
     "ODI": [("powerplay", 1, 10), ("middle", 11, 40), ("death", 41, 10_000)],
+    # The Hundred: 100 balls as 20 five-ball sets. Its powerplay is the first
+    # 25 balls (sets 1-5). It has no official middle or death; the last 25
+    # balls (sets 16-20) as "death" is a STRYK convention mirroring T20.
+    "Hundred": [("powerplay", 1, 5), ("middle", 6, 15), ("death", 16, 10_000)],
 }
 DEFAULT_PHASES = PHASE_DEFINITIONS["T20"]
 PHASE_ORDER = ["powerplay", "middle", "death"]

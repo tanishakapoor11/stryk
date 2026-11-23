@@ -25,8 +25,8 @@ class StubRegistry:
     def __init__(self):
         self.ids = {}
 
-    def team(self, name):
-        return self.ids.setdefault(("team", name), len(self.ids) + 1)
+    def team(self, name, gender="MEN", national=False):
+        return self.ids.setdefault(("team", name, gender), len(self.ids) + 1)
 
     def venue(self, name, city):
         return 1
@@ -290,7 +290,7 @@ real_data = pytest.mark.skipif(not DB.exists(), reason="run scripts/ingest.py fi
 @real_data
 def test_known_ipl_records():
     """Spot-check against published IPL records."""
-    ds = store.get()
+    ds = store.get_scoped(["ipl"])  # IPL records: never the whole database
     dv = store.apply(ds.deliveries, store.Filters())
     inn = metrics.batting_innings(dv).sort_values("runs", ascending=False)
     top = inn.iloc[0]
@@ -309,7 +309,7 @@ def test_known_ipl_records():
 @real_data
 def test_innings_totals_match_the_scorecard():
     """SRH 207/4 beat RCB 172 all out, IPL 2017 opener (match 1082591)."""
-    ds = store.get()
+    ds = store.get_scoped(["ipl"])  # IPL records: never the whole database
     d = ds.deliveries[ds.deliveries["match_id"] == "1082591"]
     first, second = sorted(d["innings_id"].unique())
     a, b = d[d["innings_id"] == first], d[d["innings_id"] == second]
@@ -357,7 +357,7 @@ def test_auction_prices_absent_when_no_file_is_supplied():
     from app.analytics import auction, store
     from app.analytics.store import Filters
 
-    ds = store.get()
+    ds = store.get_scoped(["ipl"])  # IPL records: never the whole database
     if ds.is_empty:
         pytest.skip("no ingested data")
     result = auction.pool(ds, Filters(), limit=5)
@@ -391,7 +391,7 @@ def test_every_player_profile_builds():
     from app.analytics import players as player_service
     from app.analytics.store import Filters
 
-    ds = store.get()
+    ds = store.get_scoped(["ipl"])  # IPL records: never the whole database
     if ds.is_empty:
         pytest.skip("no ingested data")
 

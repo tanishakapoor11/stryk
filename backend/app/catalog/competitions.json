@@ -1,0 +1,1177 @@
+{
+ "_note": "Competition catalogue. 'match' rules assign an ingested match to this competition: by verified source event name, or by the source dataset it was imported from (optionally restricted by gender). 'description' is left null rather than written from memory; the UI composes a line from the metadata. A competition with no match rule and an 'unavailable_reason' is listed so users can see it is not covered. season_naming was chosen per competition from the data (2026-11-24): calendar_year where every season sits inside one year (and where source labels mislead, e.g. PSL 2020 playoffs labelled 2020/21); source_label where seasons cross 31 December (BBL, WBBL, SA20, ILT20).",
+ "competitions": [
+  {
+   "slug": "mens-tests",
+   "name": "Men's Test cricket",
+   "short_name": "Men's Tests",
+   "type": "INTERNATIONAL",
+   "gender": "MEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "Test"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "tests",
+     "gender": "MEN"
+    },
+    {
+     "team_type": "international",
+     "gender": "MEN",
+     "match_type": "Test"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "womens-tests",
+   "name": "Women's Test cricket",
+   "short_name": "Women's Tests",
+   "type": "INTERNATIONAL",
+   "gender": "WOMEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "Test"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "tests",
+     "gender": "WOMEN"
+    },
+    {
+     "team_type": "international",
+     "gender": "WOMEN",
+     "match_type": "Test"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "mens-odis",
+   "name": "Men's One-Day Internationals",
+   "short_name": "Men's ODIs",
+   "type": "INTERNATIONAL",
+   "gender": "MEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "ODI"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "odis",
+     "gender": "MEN"
+    },
+    {
+     "team_type": "international",
+     "gender": "MEN",
+     "match_type": "ODI"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "womens-odis",
+   "name": "Women's One-Day Internationals",
+   "short_name": "Women's ODIs",
+   "type": "INTERNATIONAL",
+   "gender": "WOMEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "ODI"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "odis",
+     "gender": "WOMEN"
+    },
+    {
+     "team_type": "international",
+     "gender": "WOMEN",
+     "match_type": "ODI"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "mens-t20is",
+   "name": "Men's T20 Internationals",
+   "short_name": "Men's T20Is",
+   "type": "INTERNATIONAL",
+   "gender": "MEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "t20s",
+     "gender": "MEN"
+    },
+    {
+     "team_type": "international",
+     "gender": "MEN",
+     "match_type": "T20"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "womens-t20is",
+   "name": "Women's T20 Internationals",
+   "short_name": "Women's T20Is",
+   "type": "INTERNATIONAL",
+   "gender": "WOMEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "t20s",
+     "gender": "WOMEN"
+    },
+    {
+     "team_type": "international",
+     "gender": "WOMEN",
+     "match_type": "T20"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "icc-mens-cricket-world-cup",
+   "name": "ICC Men's Cricket World Cup",
+   "short_name": "Men's CWC",
+   "type": "ICC_TOURNAMENT",
+   "gender": "MEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "ODI"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "icc_mens_cricket_world_cup"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "icc-mens-t20-world-cup",
+   "name": "ICC Men's T20 World Cup",
+   "short_name": "Men's T20 WC",
+   "type": "ICC_TOURNAMENT",
+   "gender": "MEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "icc_mens_t20_world_cup"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "icc-womens-cricket-world-cup",
+   "name": "ICC Women's Cricket World Cup",
+   "short_name": "Women's CWC",
+   "type": "ICC_TOURNAMENT",
+   "gender": "WOMEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "ODI"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "icc_womens_cricket_world_cup"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "icc-womens-t20-world-cup",
+   "name": "ICC Women's T20 World Cup",
+   "short_name": "Women's T20 WC",
+   "type": "ICC_TOURNAMENT",
+   "gender": "WOMEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "icc_womens_t20_world_cup"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "icc-champions-trophy",
+   "name": "ICC Champions Trophy",
+   "short_name": "Champions Trophy",
+   "type": "ICC_TOURNAMENT",
+   "gender": "MEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "ODI"
+   ],
+   "is_active": true,
+   "match": [],
+   "description": null,
+   "unavailable_reason": "Cricsheet has no separate dataset; the matches are inside the men's ODI dataset but are not yet identified by event name."
+  },
+  {
+   "slug": "icc-world-test-championship",
+   "name": "ICC World Test Championship",
+   "short_name": "WTC",
+   "type": "ICC_TOURNAMENT",
+   "gender": "MEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "Test"
+   ],
+   "is_active": true,
+   "match": [],
+   "description": null,
+   "unavailable_reason": "A points league spanning bilateral Test series; no source in use publishes its standings or match membership."
+  },
+  {
+   "slug": "icc-u19-mens-cricket-world-cup",
+   "name": "ICC U19 Men's Cricket World Cup",
+   "short_name": "U19 Men's CWC",
+   "type": "ICC_TOURNAMENT",
+   "gender": "MEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [],
+   "is_active": true,
+   "match": [],
+   "description": null,
+   "unavailable_reason": "Not published by any source STRYK currently uses."
+  },
+  {
+   "slug": "icc-u19-womens-t20-world-cup",
+   "name": "ICC U19 Women's T20 World Cup",
+   "short_name": "U19 Women's T20 WC",
+   "type": "ICC_TOURNAMENT",
+   "gender": "WOMEN",
+   "country": null,
+   "governing_body": "International Cricket Council",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [],
+   "is_active": true,
+   "match": [],
+   "description": null,
+   "unavailable_reason": "Not published by any source STRYK currently uses."
+  },
+  {
+   "slug": "ipl",
+   "name": "Indian Premier League",
+   "short_name": "IPL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "IND",
+   "governing_body": "Board of Control for Cricket in India",
+   "season_naming": "calendar_year",
+   "points_system": "ipl-league",
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "event": "Indian Premier League",
+     "gender": "MEN"
+    },
+    {
+     "provider": "cricsheet",
+     "dataset": "ipl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "wpl",
+   "name": "Women's Premier League",
+   "short_name": "WPL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "WOMEN",
+   "country": "IND",
+   "governing_body": "Board of Control for Cricket in India",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "wpl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "womens-t20-challenge",
+   "name": "Women's T20 Challenge",
+   "short_name": "WT20C",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "WOMEN",
+   "country": "IND",
+   "governing_body": "Board of Control for Cricket in India",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": false,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "wtc"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "bbl",
+   "name": "Big Bash League",
+   "short_name": "BBL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "AUS",
+   "governing_body": "Cricket Australia",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "bbl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "wbbl",
+   "name": "Women's Big Bash League",
+   "short_name": "WBBL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "WOMEN",
+   "country": "AUS",
+   "governing_body": "Cricket Australia",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "wbb"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "psl",
+   "name": "Pakistan Super League",
+   "short_name": "PSL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "PAK",
+   "governing_body": "Pakistan Cricket Board",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "psl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "sa20",
+   "name": "SA20",
+   "short_name": "SA20",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "RSA",
+   "governing_body": "Cricket South Africa",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "sat"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "mzansi-super-league",
+   "name": "Mzansi Super League",
+   "short_name": "MSL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "RSA",
+   "governing_body": "Cricket South Africa",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": false,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "msl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "cpl",
+   "name": "Caribbean Premier League",
+   "short_name": "CPL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "WI",
+   "governing_body": null,
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "cpl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "wcpl",
+   "name": "Women's Caribbean Premier League",
+   "short_name": "WCPL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "WOMEN",
+   "country": "WI",
+   "governing_body": null,
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "wcl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "ilt20",
+   "name": "International League T20",
+   "short_name": "ILT20",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "UAE",
+   "governing_body": "Emirates Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "ilt"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "mlc",
+   "name": "Major League Cricket",
+   "short_name": "MLC",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "USA",
+   "governing_body": null,
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "mlc"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "bpl",
+   "name": "Bangladesh Premier League",
+   "short_name": "BPL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "BAN",
+   "governing_body": "Bangladesh Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "bpl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "lpl",
+   "name": "Lanka Premier League",
+   "short_name": "LPL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "SL",
+   "governing_body": "Sri Lanka Cricket",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "lpl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "npl",
+   "name": "Nepal Premier League",
+   "short_name": "NPL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "NEP",
+   "governing_body": "Cricket Association of Nepal",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "npl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "the-hundred-mens",
+   "name": "The Hundred Men's Competition",
+   "short_name": "Hundred (M)",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "MEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "Hundred"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "hnd",
+     "gender": "MEN"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "the-hundred-womens",
+   "name": "The Hundred Women's Competition",
+   "short_name": "Hundred (W)",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "WOMEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "calendar_year",
+   "points_system": null,
+   "formats": [
+    "Hundred"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "hnd",
+     "gender": "WOMEN"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "syed-mushtaq-ali-trophy",
+   "name": "Syed Mushtaq Ali Trophy",
+   "short_name": "SMAT",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "IND",
+   "governing_body": "Board of Control for Cricket in India",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "sma"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "ranji-trophy",
+   "name": "Ranji Trophy",
+   "short_name": "Ranji",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "IND",
+   "governing_body": "Board of Control for Cricket in India",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "First-class"
+   ],
+   "is_active": true,
+   "match": [],
+   "description": null,
+   "unavailable_reason": "Not published by any source STRYK currently uses."
+  },
+  {
+   "slug": "vijay-hazare-trophy",
+   "name": "Vijay Hazare Trophy",
+   "short_name": "VHT",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "IND",
+   "governing_body": "Board of Control for Cricket in India",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "List A"
+   ],
+   "is_active": true,
+   "match": [],
+   "description": null,
+   "unavailable_reason": "Not published by any source STRYK currently uses."
+  },
+  {
+   "slug": "duleep-trophy",
+   "name": "Duleep Trophy",
+   "short_name": "Duleep",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "IND",
+   "governing_body": "Board of Control for Cricket in India",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "First-class"
+   ],
+   "is_active": true,
+   "match": [],
+   "description": null,
+   "unavailable_reason": "Not published by any source STRYK currently uses."
+  },
+  {
+   "slug": "county-championship",
+   "name": "County Championship",
+   "short_name": "County Champ",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "First-class"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "cch"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "bob-willis-trophy",
+   "name": "Bob Willis Trophy",
+   "short_name": "BWT",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "First-class"
+   ],
+   "is_active": false,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "bwt"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "t20-blast",
+   "name": "T20 Blast",
+   "short_name": "Blast",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "ntb"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "one-day-cup-england",
+   "name": "One-Day Cup (England)",
+   "short_name": "One-Day Cup",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "List A"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "rlc"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "womens-t20-blast",
+   "name": "Women's T20 Blast",
+   "short_name": "Women's Blast",
+   "type": "DOMESTIC",
+   "gender": "WOMEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "wtb"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "womens-one-day-cup-england",
+   "name": "ECB Women's One-Day Cup",
+   "short_name": "Women's ODC",
+   "type": "DOMESTIC",
+   "gender": "WOMEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "List A"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "wod"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "charlotte-edwards-cup",
+   "name": "Charlotte Edwards Cup",
+   "short_name": "CEC",
+   "type": "DOMESTIC",
+   "gender": "WOMEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "cec"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "rachael-heyhoe-flint-trophy",
+   "name": "Rachael Heyhoe Flint Trophy",
+   "short_name": "RHF Trophy",
+   "type": "DOMESTIC",
+   "gender": "WOMEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "List A"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "rhf"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "womens-cricket-super-league",
+   "name": "Women's Cricket Super League",
+   "short_name": "WCSL",
+   "type": "FRANCHISE_LEAGUE",
+   "gender": "WOMEN",
+   "country": "ENG",
+   "governing_body": "England and Wales Cricket Board",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": false,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "wsl"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "sheffield-shield",
+   "name": "Sheffield Shield",
+   "short_name": "Shield",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "AUS",
+   "governing_body": "Cricket Australia",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "First-class"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "ssh"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "one-day-cup-australia",
+   "name": "One-Day Cup (Australia)",
+   "short_name": "One-Day Cup",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "AUS",
+   "governing_body": "Cricket Australia",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "List A"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "odc"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "plunket-shield",
+   "name": "Plunket Shield",
+   "short_name": "Plunket",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "NZ",
+   "governing_body": "New Zealand Cricket",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "First-class"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "pks"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "super-smash-mens",
+   "name": "Super Smash (men)",
+   "short_name": "Super Smash",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "NZ",
+   "governing_body": "New Zealand Cricket",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "ssm",
+     "gender": "MEN"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "super-smash-womens",
+   "name": "Super Smash (women)",
+   "short_name": "Super Smash (W)",
+   "type": "DOMESTIC",
+   "gender": "WOMEN",
+   "country": "NZ",
+   "governing_body": "New Zealand Cricket",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "ssm",
+     "gender": "WOMEN"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "the-ford-trophy",
+   "name": "The Ford Trophy",
+   "short_name": "Ford Trophy",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "NZ",
+   "governing_body": "New Zealand Cricket",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "List A"
+   ],
+   "is_active": true,
+   "match": [],
+   "description": null,
+   "unavailable_reason": "Not published by any source STRYK currently uses."
+  },
+  {
+   "slug": "csa-t20-challenge",
+   "name": "CSA T20 Challenge",
+   "short_name": "T20 Challenge",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "RSA",
+   "governing_body": "Cricket South Africa",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "ctc"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "ireland-inter-provincial-t20",
+   "name": "Inter-Provincial Twenty20 Trophy",
+   "short_name": "IP T20",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "IRE",
+   "governing_body": "Cricket Ireland",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [
+    "T20"
+   ],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "ipt"
+    }
+   ],
+   "description": null
+  },
+  {
+   "slug": "ireland-inter-provincial-cup",
+   "name": "Inter-Provincial Limited Over Cup",
+   "short_name": "IP Cup",
+   "type": "DOMESTIC",
+   "gender": "MEN",
+   "country": "IRE",
+   "governing_body": "Cricket Ireland",
+   "season_naming": "source_label",
+   "points_system": null,
+   "formats": [],
+   "is_active": true,
+   "match": [
+    {
+     "provider": "cricsheet",
+     "dataset": "ipo"
+    }
+   ],
+   "description": null
+  }
+ ]
+}

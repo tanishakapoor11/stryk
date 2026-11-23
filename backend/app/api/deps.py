@@ -15,8 +15,21 @@ from app.analytics.constants import PHASE_ORDER
 from app.analytics.store import Filters
 
 
+def scope_params(
+    competition: Optional[List[str]] = Query(
+        None,
+        description=(
+            "Competition slug or id, repeatable. Defaults to the configured default "
+            "competition. Competitions of different genders or formats cannot be combined."
+        ),
+    ),
+) -> Optional[List[str]]:
+    return competition or None
+
+
 def filter_params(
     season: Optional[List[int]] = Query(None, description="Season year, repeatable"),
+    season_id: Optional[List[int]] = Query(None, description="Season id, repeatable"),
     team: Optional[List[int]] = Query(None, description="Team id, repeatable"),
     opposition: Optional[List[int]] = Query(None),
     venue: Optional[List[int]] = Query(None),
@@ -43,4 +56,5 @@ def filter_params(
         date_from=date_from,
         date_to=date_to,
         include_super_over=include_super_over,
+        season_ids=season_id,
     )
