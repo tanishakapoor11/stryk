@@ -334,6 +334,34 @@ def test_reimport_is_idempotent(mixed_db, tmp_path):
     assert stats.ingested == 0 and stats.skipped == 5
 
 
+def test_one_person_in_both_squads_does_not_abort_the_import(db_engine, tmp_path):
+    """Cricsheet sometimes resolves two scorecard names to one registry person.
+
+    Real example: match 1130677 lists KV Sharma for both Vidarbha and Railways,
+    so the squad carries the same player_id twice and the (match_id, player_id)
+    unique constraint rejects the batch. One bad file used to abort a whole
+    dataset -- it took down the entire Syed Mushtaq Ali and T20I imports.
+    """
+    directory = tmp_path / "ipl_json"
+    directory.mkdir(parents=True, exist_ok=True)
+    _match_file(directory, "dup1", teams=["Alpha", "Beta"],
+                outcome={"winner": "Alpha", "by": {"runs": 10}},
+                innings=[_innings("Alpha", 60, 36, 2, _squad("Alpha"), "Beta11")])
+    doc = json.loads((directory / "dup1.json").read_text())
+    people = doc["info"]["registry"]["people"]
+    people["Beta1"] = people["Alpha1"]  # one person, listed on both sides
+    (directory / "dup1.json").write_text(json.dumps(doc))
+
+    stats = _ingest(db_engine, directory, "ipl")
+    assert stats.ingested == 1
+
+    with Session(db_engine) as db:
+        squad = db.execute(text(
+            "select count(*) from match_player where match_id = 'dup1'")).scalar()
+    # 22 listed, but one is the same person twice: 21 distinct rows.
+    assert squad == 21
+
+
 # ------------------------------------------------------------------ scoping
 def test_default_scope_is_the_default_competition(mixed_db):
     from app.analytics import store

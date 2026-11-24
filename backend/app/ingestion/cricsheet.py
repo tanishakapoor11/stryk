@@ -480,8 +480,13 @@ def ingest_directory(
 
         db.flush()  # materialise any newly seen Player rows before FK inserts
         db.execute(insert(Match), [parsed["match"]])
-        if parsed["squad"]:
-            db.execute(insert(MatchPlayer), parsed["squad"])
+        # Cricsheet occasionally lists one registry person in both squads of a
+        # match (e.g. 1130677, KV Sharma for Vidarbha and Railways), which the
+        # (match_id, player_id) unique constraint rejects. Keep the first row,
+        # same as officials below.
+        squad = list({(r["match_id"], r["player_id"]): r for r in parsed["squad"]}.values())
+        if squad:
+            db.execute(insert(MatchPlayer), squad)
         officials = list({(o["player_id"], o["role"]): o for o in parsed["officials"]}.values())
         if officials:
             db.execute(insert(MatchOfficial), officials)
