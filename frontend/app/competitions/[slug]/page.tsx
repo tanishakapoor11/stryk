@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { JsonLd, pageMeta, SITE_URL } from "@/lib/seo";
 import { ArrowRight, CalendarX } from "lucide-react";
 import { apiOrNull, ApiError } from "@/lib/api";
 import { PageHeader, Section } from "@/components/layout/page-header";
@@ -39,7 +40,17 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     return { title: "Competition" };
   }
   if (!c) notFound();
-  return { title: c.name };
+  const cov = c.coverage;
+  return pageMeta({
+    title: c.name,
+    description:
+      `${c.name}: seasons, tables, results and ball-by-ball statistics`
+      + (cov?.first_match && cov?.last_match
+          ? ` from ${cov.first_match.slice(0, 4)} to ${cov.last_match.slice(0, 4)}`
+          : "")
+      + (cov?.matches ? `, computed from ${cov.matches} matches.` : "."),
+    path: `/competitions/${params.slug}`,
+  });
 }
 
 /** One page for every competition, configured by its metadata and data coverage. */

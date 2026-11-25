@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api, apiOrNull, ApiError } from "@/lib/api";
+import { JsonLd, pageMeta, scopeName, SITE_URL } from "@/lib/seo";
 import { CompetitionSwitcher } from "@/components/competitions/competition-switcher";
 import { filterQuery, type RawParams } from "@/lib/search-params";
 import { Hint } from "@/components/ui/tooltip";
@@ -52,7 +53,40 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
     return { title: "Player" };
   }
   if (!profile) notFound();
-  return { title: profile.player.name };
+  return pageMeta({
+    title: profile.player.name,
+    description: playerDescription(profile),
+    path: `/players/${params.id}`,
+  });
+}
+
+/**
+ * A snippet built only from figures the profile actually carries. Search
+ * engines show this verbatim, so nothing here is estimated or rounded into a
+ * claim the page does not make: a player with no batting record simply does
+ * not get a batting clause.
+ */
+function playerDescription(p: PlayerProfile): string {
+  const where = scopeName(p.scope?.competitions, p.competitions);
+  const parts: string[] = [];
+  if (p.batting?.runs) {
+    parts.push(
+      `${num(p.batting.runs)} runs` +
+        (p.batting.strike_rate ? ` at a strike rate of ${dec(p.batting.strike_rate)}` : ""),
+    );
+  }
+  if (p.bowling?.wickets) {
+    parts.push(
+      `${num(p.bowling.wickets)} wickets` +
+        (p.bowling.economy ? ` at ${dec(p.bowling.economy)} an over` : ""),
+    );
+  }
+  const record = parts.length ? parts.join(" and ") : "every delivery they have faced and bowled";
+  const seasons = p.player.seasons?.length
+    ? `, ${p.player.seasons[0]}\u2013${p.player.seasons[p.player.seasons.length - 1]}`
+    : "";
+  return `${p.player.name}'s ball-by-ball record${where ? ` in ${where}` : ""}: ${record}, `
+    + `across ${num(p.player.matches)} matches${seasons}.`;
 }
 
 export default async function PlayerPage({
@@ -97,6 +131,30 @@ export default async function PlayerPage({
 
   return (
     <>
+      {/* Person, not a sport-specific type: Schema.org has no cricketer, and
+          an athlete is described with Person + the teams they play for. Only
+          fields the profile actually carries are emitted. */}
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Person",
+          name: p.player.name,
+          ...(p.player.scorecard_name && p.player.scorecard_name !== p.player.name
+            ? { alternateName: p.player.scorecard_name }
+            : {}),
+          url: `${SITE_URL}/players/${params.id}`,
+          ...(p.player.role ? { jobTitle: `Cricketer (${p.player.role})` } : {}),
+          ...(p.player.teams?.length
+            ? {
+                memberOf: p.player.teams.map((t) => ({
+                  "@type": "SportsTeam",
+                  name: t.team_name,
+                  url: `${SITE_URL}/teams/${t.team_id}`,
+                })),
+              }
+            : {}),
+        }}
+      />
       <div className="border-b border-line bg-surface-sunken">
         <div className="mx-auto max-w-[1600px] px-4 pb-6 pt-5 lg:px-6">
           <Breadcrumbs

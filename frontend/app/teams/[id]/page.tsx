@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { JsonLd, pageMeta, scopeName, SITE_URL } from "@/lib/seo";
 import { AlertTriangle } from "lucide-react";
 import { api, apiOrNull, ApiError } from "@/lib/api";
 import { CompetitionSwitcher } from "@/components/competitions/competition-switcher";
@@ -42,7 +43,17 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
     return { title: "Team" };
   }
   if (!team) notFound();
-  return { title: team.team.name };
+  const t = team.team;
+  const where = scopeName(team.scope?.competitions, team.competitions);
+  const years = team.by_season?.map((r) => r.season) ?? [];
+  const span = years.length ? `, ${Math.min(...years)}\u2013${Math.max(...years)}` : "";
+  return pageMeta({
+    title: t.name,
+    description:
+      `${t.name}'s ball-by-ball record${where ? ` in ${where}` : ""}: `
+      + `results, players and how they score and concede across ${team.record?.played ?? 0} matches${span}.`,
+    path: `/teams/${params.id}`,
+  });
 }
 
 export default async function TeamPage({
@@ -74,6 +85,16 @@ export default async function TeamPage({
 
   return (
     <>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "SportsTeam",
+          name: profile.team.name,
+          ...(profile.team.short_name ? { alternateName: profile.team.short_name } : {}),
+          sport: "Cricket",
+          url: `${SITE_URL}/teams/${params.id}`,
+        }}
+      />
       <div
         style={teamVars(profile.team.name)}
         className="relative overflow-hidden border-b border-line bg-surface-sunken"

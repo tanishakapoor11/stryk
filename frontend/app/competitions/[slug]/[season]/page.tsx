@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { pageMeta } from "@/lib/seo";
 import { CalendarX } from "lucide-react";
 import { apiOrNull, ApiError } from "@/lib/api";
 import { PageHeader, Section } from "@/components/layout/page-header";
@@ -24,7 +25,14 @@ export async function generateMetadata({ params }: { params: { slug: string; sea
     return { title: "Season" };
   }
   if (!s) notFound();
-  return { title: `${s.competition.short_name ?? s.competition.name} ${s.season.name}` };
+  const name = `${s.competition.short_name ?? s.competition.name} ${s.season.name}`;
+  return pageMeta({
+    title: name,
+    description:
+      `${s.competition.name} ${s.season.name}: table, results and leading run-scorers and `
+      + `wicket-takers, every figure computed from the deliveries bowled.`,
+    path: `/competitions/${params.slug}/${params.season}`,
+  });
 }
 
 /**
