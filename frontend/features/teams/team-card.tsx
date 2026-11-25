@@ -13,7 +13,7 @@ import type { TeamSummary } from "@/types";
  * cards can be compared at a glance without reading any numbers — which is how
  * most people will actually use this page.
  */
-export function TeamCard({ team }: { team: TeamSummary }) {
+export function TeamCard({ team, competition }: { team: TeamSummary; competition?: string }) {
   const identity = teamIdentity(team.name);
   const winPct = team.win_pct ?? 0;
   // Real artwork if the operator supplied it; otherwise the generated badge.
@@ -21,7 +21,7 @@ export function TeamCard({ team }: { team: TeamSummary }) {
 
   return (
     <Link
-      href={`/teams/${team.id}`}
+      href={competition ? `/teams/${team.id}?competition=${competition}` : `/teams/${team.id}`}
       style={teamVars(team.name)}
       className="card-interactive group relative block overflow-hidden rounded-xl border border-line bg-surface hover:border-line-strong"
     >

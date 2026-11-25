@@ -27,6 +27,7 @@ of the run. They are searchable by that name; nothing is invented for them.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import io
 import sys
@@ -277,6 +278,16 @@ def apply_to_database(rows: list[dict]) -> int:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--bulk-only", action="store_true",
+        help="skip the one-per-second Wikidata search for the remainder. The three "
+             "bulk requests resolve most players in a couple of minutes; the "
+             "per-player fallback took over five hours against Wikidata's rate "
+             "limiter and covers associate-nation players almost exclusively.",
+    )
+    args = ap.parse_args()
+
     ensure_column()
     players = scorecard_names()
     if not players:
@@ -306,7 +317,11 @@ def main() -> int:
             rows.append({"cricsheet_id": pid, "scorecard_name": scorecard,
                          "full_name": scorecard, "aliases": "|".join(known)})
 
-    if needs_search:
+    if needs_search and args.bulk_only:
+        print(f"--bulk-only: leaving {len(needs_search)} name(s) unresolved; "
+              "they keep their scorecard name and stay searchable by it")
+        needs_search = []
+    elif needs_search:
         print(f"resolving {len(needs_search)} remaining name(s) via the Wikidata search API")
     unresolved = []
     for index, (pid, scorecard, known) in enumerate(needs_search):

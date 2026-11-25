@@ -12,6 +12,7 @@ import { FilterBar } from "@/features/filters/filter-bar";
 import { HeroSearch } from "@/features/overview/hero-search";
 import { FeaturedInningsCard } from "@/features/overview/featured-innings";
 import { StarPlayers } from "@/features/overview/star-players";
+import { PartialCoverageNote } from "@/features/overview/partial-coverage";
 import { InsightsPanel } from "@/features/overview/insights";
 import { Leaderboards } from "@/features/overview/leaderboards";
 import { OverviewCharts } from "@/features/overview/charts";
@@ -69,9 +70,19 @@ export default async function HomePage({ searchParams }: { searchParams: RawPara
   }
 
   const withData = summary.with_data;
+  // The home page shows the headline competitions, not all 130-odd: the rest
+  // are a click away in the directory, which is ordered the same way.
+  const FEATURED = 16;
   const women = withData.filter((c) => c.gender === "WOMEN");
   const spotlightSlug = one(searchParams, "competition") ?? "ipl";
   const spotlight = withData.find((c) => c.slug === spotlightSlug) ?? withData[0];
+  // The switcher offers the same competitions as the grid, plus whichever one
+  // is open: a link to a competition outside the top set must still show it as
+  // the current choice rather than silently dropping out of its own nav.
+  const spotlightOptions = withData.slice(0, FEATURED);
+  if (spotlight && !spotlightOptions.some((c) => c.slug === spotlight.slug)) {
+    spotlightOptions.push(spotlight);
+  }
   const firstYear = summary.first_match?.slice(0, 4);
   const lastYear = summary.last_match?.slice(0, 4);
   const womensMatches = summary.matches_by_gender.WOMEN ?? 0;
@@ -165,19 +176,34 @@ export default async function HomePage({ searchParams }: { searchParams: RawPara
               <h2 className="font-display text-xl font-semibold tracking-tight text-ink">
                 Competitions with ball-by-ball data
               </h2>
-              <p className="mt-1 text-xs text-ink-muted">Most recently played first.</p>
+              <p className="mt-1 text-xs text-ink-muted">
+                The {Math.min(FEATURED, withData.length)} most followed, of {withData.length} with data.
+              </p>
             </div>
             <Link href="/competitions" className="flex items-center gap-1 text-xs text-accent hover:underline">
               All {summary.competitions.catalogued} competitions <ArrowRight className="h-3 w-3" aria-hidden />
             </Link>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {withData.map((c) => (
+            {withData.slice(0, FEATURED).map((c) => (
               <CompetitionCard key={c.slug} competition={c} />
             ))}
           </div>
         </div>
+      </Section>
 
+      {spotlight ? (
+        <Suspense fallback={<Section><Skeleton className="h-96" /></Section>}>
+          <Spotlight
+            slug={spotlight.slug}
+            name={spotlight.name}
+            options={spotlightOptions.map((c) => ({ slug: c.slug, label: c.short_name ?? c.name }))}
+            searchParams={searchParams}
+          />
+        </Suspense>
+      ) : null}
+
+      <Section className="space-y-10">
         {women.length ? (
           <div>
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -211,17 +237,6 @@ export default async function HomePage({ searchParams }: { searchParams: RawPara
           <ResultsList matches={summary.latest_results} />
         </Panel>
       </Section>
-
-      {spotlight ? (
-        <Suspense fallback={<Section><Skeleton className="h-96" /></Section>}>
-          <Spotlight
-            slug={spotlight.slug}
-            name={spotlight.name}
-            options={withData.map((c) => ({ slug: c.slug, label: c.short_name ?? c.name }))}
-            searchParams={searchParams}
-          />
-        </Suspense>
-      ) : null}
     </>
   );
 }
@@ -261,6 +276,10 @@ async function Spotlight({
     );
   }
   const s = data.summary;
+  // Cumulative lists are a real all-time order only where STRYK holds every
+  // season the competition has played; where it does not they are withheld.
+  const coverage = data.coverage;
+  const cumulativeIsHonest = coverage?.complete !== false;
 
   return (
     <div id="spotlight" className="scroll-mt-16 border-t border-line bg-surface-sunken/40">
@@ -302,13 +321,22 @@ async function Spotlight({
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 space-y-6">
-            <div>
-              <h3 className="font-display text-base font-semibold tracking-tight text-ink">Stars of the competition</h3>
-              <p className="mt-1 text-xs text-ink-muted">Tap any card for the full ball-by-ball record.</p>
-              <div className="mt-3">
-                <StarPlayers batters={topBatters.rows} bowlers={topBowlers.rows} />
+            {cumulativeIsHonest ? (
+              <div>
+                <h3 className="font-display text-base font-semibold tracking-tight text-ink">Stars of the competition</h3>
+                <p className="mt-1 text-xs text-ink-muted">Tap any card for the full ball-by-ball record.</p>
+                <div className="mt-3">
+                  <StarPlayers
+                    batters={topBatters.rows}
+                    bowlers={topBowlers.rows}
+                    seasonRange={s.season_range}
+                    complete={coverage?.complete === true}
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <PartialCoverageNote name={name} coverage={coverage!} />
+            )}
             {data.featured_innings ? <FeaturedInningsCard innings={data.featured_innings} /> : null}
           </div>
           <aside className="min-w-0">
@@ -316,7 +344,7 @@ async function Spotlight({
           </aside>
         </div>
 
-        <Leaderboards boards={data.leaderboards} />
+        {cumulativeIsHonest ? <Leaderboards boards={data.leaderboards} /> : null}
 
         <div className="space-y-4">
           <div className="max-w-xl">

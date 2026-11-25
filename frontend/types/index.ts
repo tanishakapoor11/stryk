@@ -114,8 +114,18 @@ export interface QualifiedBoard {
   rows: Array<Record<string, unknown>>;
 }
 
+/** Whether STRYK holds every season a competition has played. */
+export interface ScopeCoverage {
+  complete: boolean | null;
+  /** The year the competition began, null where its lineage is ambiguous. */
+  begins: number | null;
+  indexed_from: number | null;
+  indexed_to: number | null;
+}
+
 export interface OverviewPayload {
   scope?: Scope;
+  coverage?: ScopeCoverage;
   summary: Summary;
   leaderboards: {
     most_runs: BattingLine[];
@@ -301,10 +311,10 @@ export interface TeamProfile {
 
 export interface SeasonMeta { season: number; matches: number }
 export interface SearchHit {
-  type: "player" | "team" | "competition";
+  type: "player" | "team" | "competition" | "season";
   id: string | number;
   name: string;
-  /** Scorecard name for a player, short name for a team. */
+  /** Scorecard name for a player, short name for a team or season's competition. */
   secondary: Nullable<string>;
   detail: Nullable<string>;
   href: string;

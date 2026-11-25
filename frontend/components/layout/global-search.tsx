@@ -115,9 +115,9 @@ export function GlobalSearch() {
                 }`}
               >
                 {hit.type === "player" ? <PlayerAvatar name={hit.name} size="sm" /> : null}
-                {hit.type === "competition" ? (
+                {hit.type === "competition" || hit.type === "season" ? (
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-line-strong text-[9px] text-ink-muted">
-                    CMP
+                    {hit.type === "season" ? "YR" : "CMP"}
                   </span>
                 ) : null}
                 <span className="min-w-0 flex-1">

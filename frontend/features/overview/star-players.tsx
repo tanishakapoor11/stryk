@@ -15,21 +15,36 @@ import type { PlayerRow } from "@/types";
 export function StarPlayers({
   batters,
   bowlers,
+  seasonRange,
+  complete = false,
 }: {
   batters: PlayerRow[];
   bowlers: PlayerRow[];
+  /** The seasons STRYK holds ball-by-ball data for, named in the caption. */
+  seasonRange?: number[];
+  /** True when that is every season the competition has played. */
+  complete?: boolean;
 }) {
+  // A cumulative list is only a real all-time order where the data covers the
+  // whole competition, which is why the caller withholds this row otherwise.
+  // Where it does - every IPL season, every men's T20I - the caption says so,
+  // because "2008-2026" alone reads like a slice of something longer.
+  const span = seasonRange?.length === 2 ? `${seasonRange[0]}\u2013${seasonRange[1]}` : null;
+  const runs = complete && span ? `Every season, ${span}` : span ? `Runs in ${span}` : "Runs";
+  const wickets = complete && span
+    ? `Every season, ${span} \u00b7 credited to the bowler`
+    : "Wickets credited to the bowler";
   return (
     <div className="space-y-5">
       <StarRow
         title="Most runs"
-        caption="Career runs in the indexed seasons"
+        caption={runs}
         players={batters}
         stat={(p) => ({ value: num(p.runs), label: "runs", second: `${dec(p.strike_rate)} SR` })}
       />
       <StarRow
         title="Most wickets"
-        caption="Wickets credited to the bowler"
+        caption={wickets}
         players={bowlers}
         stat={(p) => ({ value: num(p.wickets), label: "wickets", second: `${dec(p.economy)} econ` })}
       />
