@@ -384,6 +384,178 @@ def test_empty_innings_and_spell_tables_keep_their_full_shape():
     assert list(metrics.bowling_spells(empty).columns) == metrics.BOWLING_SPELLS_COLUMNS
 
 
+def test_one_cold_scope_is_read_once_however_many_requests_want_it():
+    """A page asks for its scope from several endpoints at once. Reading a
+    competition's deliveries is seconds of random I/O, so the second request
+    must wait for the first rather than run its own copy."""
+    import threading
+    import time as _time
+
+    from app.analytics import store
+
+    calls = []
+    real = store.load_deliveries
+
+    def slow(ids, matches):
+        calls.append(tuple(ids))
+        _time.sleep(0.2)          # long enough for the others to pile up behind it
+        return real(ids, matches)
+
+    base = store.get()
+    scope = store.resolve_scope(base, ["ipl"])
+    store._scoped.clear()
+    store._scope_locks.clear()
+    store.load_deliveries = slow
+    try:
+        out = []
+        threads = [threading.Thread(target=lambda: out.append(store.scoped(scope, base)))
+                   for _ in range(5)]
+        for x in threads:
+            x.start()
+        for x in threads:
+            x.join()
+    finally:
+        store.load_deliveries = real
+        store._scoped.clear()
+
+    assert len(calls) == 1, f"read the same scope {len(calls)} times"
+    assert len(out) == 5 and all(d is out[0] for d in out), "every caller gets the one dataset"
+
+
+def test_least_recently_used_scope_is_the_one_evicted():
+    """Moving between two competitions' pages must not re-read a competition
+    just because the reader glanced at another one in between."""
+    from app.analytics import store
+
+    store._scoped.clear()
+    keys = [("base", (n,)) for n in range(3)]
+    for k in keys:
+        store._scoped[k] = f"scope {k}"
+    store._touch(keys[0])                          # oldest, but just used
+    store._scoped.pop(next(iter(store._scoped)))   # what _build_scope evicts
+    assert keys[0] in store._scoped, "the just-used scope was evicted"
+    assert keys[1] not in store._scoped, "the least recently used one should go"
+    store._scoped.clear()
+
+
+def test_scope_cache_is_bounded_by_rows_not_by_entries():
+    """One County Championship scope is 2.5M deliveries and over a gigabyte;
+    four of them would swap the machine, which costs far more than re-reading."""
+    import pandas as pd
+
+    from app.analytics import store
+    from app.analytics.store import Dataset
+
+    def fake(rows):
+        return Dataset(deliveries=pd.DataFrame({"x": range(rows)}), positions=pd.DataFrame(),
+                       matches=pd.DataFrame(), players=pd.DataFrame(), teams=pd.DataFrame(),
+                       squads=pd.DataFrame(), venues=pd.DataFrame(), loaded_at=dt.datetime.utcnow())
+
+    store._scoped.clear()
+    try:
+        small = store._SCOPE_ROW_BUDGET // 4
+        for i in range(4):
+            store._scoped[("base", (i,))] = fake(small)
+        assert len(store._scoped) == 4, "four cheap scopes all fit in the budget"
+
+        # One oversized scope must not sit alongside them - nor be thrown away
+        # itself, since the request that just paid for it is about to use it.
+        store._scoped[("base", ("big",))] = fake(store._SCOPE_ROW_BUDGET + 1)
+        rows = sum(len(d.deliveries) for d in store._scoped.values())
+        while len(store._scoped) > 1 and rows > store._SCOPE_ROW_BUDGET:
+            rows -= len(store._scoped.pop(next(iter(store._scoped))).deliveries)
+        assert list(store._scoped) == [("base", ("big",))]
+    finally:
+        store._scoped.clear()
+
+
+def test_a_year_in_a_search_finds_that_edition_of_the_tournament():
+    """"Asia Cup 2023" is a question about one tournament. Without season
+    search it matches nothing at all: no competition is named "Asia Cup 2023",
+    so the year makes the competition search fail and the reader is told there
+    are no results for an edition that is held in full."""
+    from app.analytics import competitions as service
+    from app.analytics import store
+
+    ds = store.get()
+    if ds.seasons.empty:
+        pytest.skip("no ingested data")
+
+    hits = service.search_seasons(ds, "ipl 2023")
+    assert hits, "a named competition with a year should find its season"
+    assert hits[0]["slug"] == "ipl" and hits[0]["season"] == "2023"
+    assert hits[0]["matches"] > 0
+
+    # A season whose name spans two years is reachable by either year, and its
+    # URL uses "-" because "/" cannot sit in a path segment.
+    split = service.search_seasons(ds, "bbl 2019")
+    assert split and split[0]["season"] == "2019/20"
+    assert service.season_slug(split[0]["season"]) == "2019-20"
+
+    # A bare year lists that season across competitions, most prominent first.
+    bare = service.search_seasons(ds, "2016", limit=4)
+    assert bare and len({h["slug"] for h in bare}) > 1
+
+    # Nothing is returned for a season with no matches behind it, and a query
+    # naming neither a competition nor a year is not a season search at all.
+    assert all(h["matches"] > 0 for h in bare)
+    assert service.search_seasons(ds, "kohli") == []
+    assert service.names_a_year("asia cup 2023") and not service.names_a_year("asia cup")
+
+
+def test_a_scope_is_read_from_disk_the_second_time_and_not_from_sql():
+    """Reading a competition out of SQLite is an index lookup per match and
+    millions of rows built one at a time; the same frame unpickles in a
+    fraction of the time, and the ball table only changes on ingestion."""
+    from app.analytics import store
+
+    base = store.get()
+    ipl = [int(i) for i in base.competitions.index[base.competitions["slug"] == "ipl"]]
+    if not ipl:
+        pytest.skip("no ingested data")
+    cache = store._scope_cache_path(ipl)
+    cache.unlink(missing_ok=True)
+
+    first = store.load_deliveries(ipl, base.matches)
+    assert cache.exists(), "the frame was not written to the disk cache"
+
+    # With the database made to look newer, the cache must be ignored.
+    import os
+    os.utime(cache, (0, 0))
+    assert store.load_deliveries(ipl, base.matches).equals(first)
+    assert cache.stat().st_mtime > 0, "a stale cache should be rebuilt, not reused"
+
+    # And with it current, the cache is what gets read: break SQL to prove it.
+    def explode(*a, **k):
+        raise AssertionError("went to SQL despite a fresh disk cache")
+
+    real = store._read
+    store._read = explode
+    try:
+        again = store.load_deliveries(ipl, base.matches)
+    finally:
+        store._read = real
+    assert len(again) == len(first)
+    assert list(again.columns) == list(first.columns)
+
+
+def test_a_scope_with_no_deliveries_keeps_the_full_ball_table_shape():
+    """Competitions are catalogued before their data is ingested, and the ball
+    table is now read per scope rather than sliced out of one global frame. An
+    empty read must still carry every derived and context column, or the first
+    analysis of an empty competition dies with a KeyError."""
+    from app.analytics import store
+    from app.analytics.store import Filters
+
+    populated = store.load_deliveries([], pd.DataFrame())
+    for column in ("is_four", "is_six", "is_batter_dot", "is_bowler_dot", "out_player_id",
+                   "out_kind", "out_credited_to_bowler", "date", "match_type",
+                   "competition_id", "season_id"):
+        assert column in populated.columns, column
+    assert populated.empty
+    assert store.apply(populated, Filters()).empty
+
+
 def test_every_player_profile_builds():
     """Profiles for the smallest samples in the dataset, which are where the
     shape bugs live: a one-match bowler who never faced a ball, a batter run

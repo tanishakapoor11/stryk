@@ -19,7 +19,7 @@ log = logging.getLogger("stryk")
 async def lifespan(app: FastAPI):
     try:
         ds = store.get()
-        log.info("dataset ready: %s deliveries", len(ds.deliveries))
+        log.info("dataset ready: %s matches", len(ds.matches))
     except Exception as exc:  # the API still boots so /health can explain itself
         log.error("could not load dataset at startup: %s", exc)
     yield
@@ -54,8 +54,8 @@ def health():
     try:
         ds = store.get()
         return {
-            "status": "ok" if not ds.is_empty else "empty",
-            "deliveries": int(len(ds.deliveries)),
+            "status": "ok" if not ds.matches.empty else "empty",
+            "deliveries": int(store.ball_totals()["balls"].sum()),
             "matches": int(ds.matches["id"].nunique()) if not ds.matches.empty else 0,
             "loaded_at": ds.loaded_at.isoformat() + "Z",
         }

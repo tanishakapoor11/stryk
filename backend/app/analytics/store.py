@@ -1,24 +1,34 @@
 """In-memory fact table + filter vocabulary for the analytics layer.
 
 Every analytic in Stryk is a pandas aggregation over one denormalised ball
-table that is read from the database once and cached. At IPL scale (~300k
-deliveries, ~60 MB) this is far cheaper to maintain - and faster - than a
-bespoke SQL query per metric, and it keeps the statistical rules in one place.
+table, which is far cheaper to maintain - and faster - than a bespoke SQL
+query per metric, and keeps the statistical rules in one place.
 
-ponytail: in-memory fact table; move to materialised SQL aggregates if the
-dataset grows past a few million deliveries or the API runs multi-process.
+The ball table is read **per competition scope**, not whole. The database
+holds every competition (~12M deliveries); a single analysis never spans more
+than one competition set, and reading all of it at startup cost minutes and
+gigabytes before the API served its first request. :func:`load` therefore
+reads only the reference tables, and :func:`scoped` reads that scope's
+deliveries on first use and caches them.
+
+ponytail: in-memory per-scope fact table; move to materialised SQL aggregates
+if one competition grows past a few million deliveries or the API runs
+multi-process.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import logging
+import shutil
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Optional, Sequence
 
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 
 from app.core.config import settings
 from app.core.db import engine
@@ -42,9 +52,39 @@ from app.models import (
 
 log = logging.getLogger("stryk.store")
 _lock = threading.Lock()
+_totals_lock = threading.Lock()
 _cache: Optional["Dataset"] = None
+_totals: Optional["pd.DataFrame"] = None
 _scoped: "dict[tuple, Dataset]" = {}
-_SCOPE_CACHE_SIZE = 32
+#: One lock per scope, so concurrent requests for the same cold scope wait for
+#: one read instead of each running their own. A page asks for its scope from
+#: several endpoints at once, and reading a competition's deliveries is seconds
+#: of random I/O over a multi-gigabyte table.
+_scope_locks: "dict[tuple, threading.Lock]" = {}
+# The scope cache is bounded by rows, not by entries, because competitions
+# differ by an order of magnitude: the IPL is ~300k deliveries (~140 MB) and
+# the County Championship ~2.5M (~1.2 GB). Counting entries would either hold
+# four County-sized scopes - five gigabytes, and the machine starts swapping,
+# which is far slower than re-reading - or evict ten cheap ones needlessly.
+# Least recently used goes first: a reader moving around one competition must
+# not lose it because they glanced at another.
+_SCOPE_ROW_BUDGET = 5_000_000
+
+
+#: Cricsheet splits twenty-over internationals by the status of the teams -
+#: "T20" where a full member is involved, "IT20" between associate members -
+#: but they are one format played under one set of rules, and the ICC has
+#: recognised both as T20Is since 2019. Pooling them is sound; keeping them
+#: apart would split the Asian Games in half and refuse the result as a scope
+#: spanning two formats.
+FORMAT_ALIASES = {"IT20": "T20"}
+
+
+def canonical_format(match_type) -> Optional[str]:
+    """The format a match is played under, whatever the source calls it."""
+    if match_type is None:
+        return None
+    return FORMAT_ALIASES.get(str(match_type), str(match_type))
 
 
 class ScopeError(ValueError):
@@ -126,8 +166,6 @@ def enrich(deliveries: pd.DataFrame, dismissals: pd.DataFrame) -> pd.DataFrame:
     Shared by the loader and the test-suite so that unit tests exercise the
     same derivation the API uses.
     """
-    if deliveries.empty:
-        return deliveries
     deliveries = deliveries.copy()
     for col in ("is_legal", "is_ball_faced", "is_wicket", "is_bowler_wicket",
                 "is_super_over", "is_chase"):
@@ -204,9 +242,7 @@ def prepare_players(players: pd.DataFrame) -> pd.DataFrame:
 
 
 def load() -> Dataset:
-    """Read the whole fact table into memory and pre-join the dismissals."""
-    deliveries = _read(select(Delivery))
-    dismissals = _read(select(Dismissal))
+    """Read the reference tables. Deliveries are read per scope by :func:`scoped`."""
     matches = _read(select(Match))
     players = _read(select(Player))
     teams = _read(select(Team))
@@ -226,16 +262,9 @@ def load() -> Dataset:
     if not matches.empty:
         matches["date"] = pd.to_datetime(matches["date"])
 
-    deliveries = enrich(deliveries, dismissals)
-    if not deliveries.empty:
-        md = matches.set_index("id")
-        deliveries["date"] = deliveries["match_id"].map(md["date"])
-        # A handful of distinct values repeated on every ball: as a category this
-        # costs ~0.3 MB instead of ~17 MB per 300k deliveries. It is only ever
-        # filtered on (never grouped by), so category semantics cannot leak.
-        deliveries["match_type"] = deliveries["match_id"].map(md["match_type"]).astype("category")
-        deliveries["competition_id"] = deliveries["match_id"].map(md["competition_id"])
-        deliveries["season_id"] = deliveries["match_id"].map(md["season_id"])
+    # No competitions: an empty ball table of the right shape, through the same
+    # path a real scope takes, so every caller sees the same columns.
+    deliveries = load_deliveries([], matches)
 
     ds = Dataset(
         deliveries=deliveries,
@@ -252,8 +281,78 @@ def load() -> Dataset:
         innings=innings,
         registry=registry,
     )
-    log.info("loaded %s deliveries / %s matches", len(deliveries), len(matches))
+    log.info("loaded %s matches; deliveries are read per competition", len(matches))
     return ds
+
+
+#: Disk kept for cached scope frames, oldest evicted first. Roughly the size
+#: of the database itself, and only competitions someone opened are stored.
+_SCOPE_DISK_BUDGET = 4_000_000_000
+
+
+def _scope_cache_path(competition_ids: Sequence[int]) -> Path:
+    name = "-".join(str(int(i)) for i in competition_ids)
+    if len(name) > 80:  # a scope of many competitions: name it by its digest
+        name = hashlib.sha1(name.encode()).hexdigest()[:20]
+    return Path(str(engine.url.database or "")).parent / "scopes" / f"{name}.pkl"
+
+
+def _evict_scope_files(keep: Path) -> None:
+    """Hold the disk cache to its budget, least recently written first."""
+    files = sorted((f for f in keep.parent.glob("*.pkl")), key=lambda f: f.stat().st_mtime)
+    total = sum(f.stat().st_size for f in files)
+    for f in files:
+        if total <= _SCOPE_DISK_BUDGET:
+            return
+        if f == keep:
+            continue
+        total -= f.stat().st_size
+        f.unlink(missing_ok=True)
+
+
+def load_deliveries(competition_ids: Sequence[int], matches: pd.DataFrame) -> pd.DataFrame:
+    """The enriched ball table for one set of competitions.
+
+    Scoping happens in SQL rather than by filtering a whole-database frame, so
+    opening the IPL reads the IPL's ~300k deliveries and not all ~12M.
+
+    The result is also kept on disk. Reading a competition out of the database
+    means an index lookup per match and millions of rows built one at a time -
+    7s for men's ODIs, 13s for the County Championship - while reading the
+    same frame back from a pickle takes 0.3s. The ball table never changes
+    except by ingestion, so the copy is good until the database is written to.
+    """
+    cache = _scope_cache_path(competition_ids) if competition_ids else None
+    if cache is not None:
+        try:
+            if cache.exists() and cache.stat().st_mtime >= _db_mtime():
+                return pd.read_pickle(cache)
+        except Exception as exc:  # a truncated or half-written cache is not fatal
+            log.warning("ignoring unreadable scope cache %s: %s", cache, exc)
+
+    scope_matches = select(Match.id).where(Match.competition_id.in_(list(competition_ids)))
+    deliveries = _read(select(Delivery).where(Delivery.match_id.in_(scope_matches)))
+    dismissals = _read(select(Dismissal).where(Dismissal.match_id.in_(scope_matches)))
+    deliveries = enrich(deliveries, dismissals)
+    md = matches.set_index("id") if not matches.empty else None
+    for col in ("date", "match_type", "competition_id", "season_id"):
+        deliveries[col] = deliveries["match_id"].map(md[col]) if md is not None else None
+    deliveries["date"] = pd.to_datetime(deliveries["date"])
+    # A handful of distinct values repeated on every ball: as a category this
+    # costs ~0.3 MB instead of ~17 MB per 300k deliveries. It is only ever
+    # filtered on (never grouped by), so category semantics cannot leak.
+    deliveries["match_type"] = deliveries["match_type"].astype("category")
+
+    if cache is not None:
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cache.with_suffix(".tmp")
+            deliveries.to_pickle(tmp)
+            tmp.replace(cache)  # atomic: a reader never sees a half-written frame
+            _evict_scope_files(cache)
+        except OSError as exc:
+            log.warning("could not cache scope %s: %s", cache, exc)
+    return deliveries
 
 
 def batting_positions(deliveries: pd.DataFrame) -> pd.DataFrame:
@@ -286,11 +385,72 @@ def get() -> Dataset:
 
 
 def reload() -> Dataset:
-    global _cache
+    global _cache, _totals
     with _lock:
         _cache = load()
+        # An explicit reload means the data changed, so the aggregate is rebuilt
+        # from the ball table rather than trusted from disk.
+        _totals = None
+        _totals_path().unlink(missing_ok=True)
+        # An explicit reload means the ball table may have changed under us.
+        shutil.rmtree(_scope_cache_path([0]).parent, ignore_errors=True)
         _scoped.clear()
+        _scope_locks.clear()
     return _cache
+
+
+#: Per competition and batter: runs off the bat (super overs excluded, as
+#: everywhere else) and balls bowled. The only figure the API needs over every
+#: competition at once - the home page's totals and its suggested names.
+_BALL_TOTALS = (
+    select(
+        Match.competition_id.label("competition_id"),
+        Delivery.batter_id.label("batter_id"),
+        func.sum(case((Delivery.is_super_over == False, Delivery.batter_runs),  # noqa: E712
+                      else_=0)).label("runs"),
+        func.count().label("balls"),
+    )
+    .join(Match, Match.id == Delivery.match_id)
+    .group_by(Match.competition_id, Delivery.batter_id)
+)
+
+
+def _totals_path() -> Path:
+    return Path(str(engine.url.database or "")).with_name("agg_ball_totals.pkl")
+
+
+def _db_mtime() -> float:
+    """When the database last changed, WAL included."""
+    path = Path(str(engine.url.database or ""))
+    return max((p.stat().st_mtime for p in (path, path.with_name(path.name + "-wal"))
+                if p.exists()), default=0.0)
+
+
+def ball_totals() -> pd.DataFrame:
+    """:data:`_BALL_TOTALS`, cached on disk.
+
+    It scans every delivery - ~30s over 12M of them - which would otherwise be
+    paid on the first home-page request of every restart. The result only changes when
+    the database does, so it is kept beside it and rebuilt on a newer mtime.
+    """
+    global _totals
+    with _totals_lock:
+        if _totals is not None:
+            return _totals
+        cache = _totals_path()
+        try:
+            if cache.exists() and cache.stat().st_mtime >= _db_mtime():
+                _totals = pd.read_pickle(cache)
+                return _totals
+        except Exception as exc:  # a stale or truncated cache must never be fatal
+            log.warning("ignoring unreadable aggregate cache %s: %s", cache, exc)
+        log.info("building whole-database ball totals (one full scan)")
+        _totals = _read(_BALL_TOTALS)
+        try:
+            _totals.to_pickle(cache)
+        except OSError as exc:
+            log.warning("could not write aggregate cache %s: %s", cache, exc)
+        return _totals
 
 
 def resolve_scope(ds: Dataset, slugs: Optional[Sequence[str]] = None) -> Scope:
@@ -318,7 +478,7 @@ def resolve_scope(ds: Dataset, slugs: Optional[Sequence[str]] = None) -> Scope:
     if len(genders) > 1:
         raise ScopeError(422, "Men's and women's competitions cannot be combined in one analysis.")
     m = ds.matches[ds.matches["competition_id"].isin(ids)] if not ds.matches.empty else ds.matches
-    formats = sorted(set(m["match_type"])) if not m.empty else []
+    formats = sorted({canonical_format(x) for x in m["match_type"]}) if not m.empty else []
     if len(formats) > 1:
         raise ScopeError(
             422, f"These competitions span formats {formats}; choose competitions of one format."
@@ -336,18 +496,37 @@ def scoped(scope: Scope, base: Optional[Dataset] = None) -> Dataset:
     """A view of the dataset restricted to ``scope``'s competitions (cached)."""
     base = base or get()
     key = (id(base), scope.competition_ids)
-    hit = _scoped.get(key)
+    hit = _touch(key)
     if hit is not None:
         return hit
+    with _lock:
+        loading = _scope_locks.setdefault(key, threading.Lock())
+    with loading:
+        # Another request may have finished this scope while we waited for it.
+        hit = _touch(key)
+        if hit is not None:
+            return hit
+        return _build_scope(key, scope, base)
+
+
+def _touch(key) -> Optional[Dataset]:
+    """The cached scope, marked as most recently used."""
+    with _lock:
+        hit = _scoped.pop(key, None)
+        if hit is not None:
+            _scoped[key] = hit
+        return hit
+
+
+def _build_scope(key, scope: Scope, base: Dataset) -> Dataset:
     ids = set(scope.competition_ids)
     matches = base.matches[base.matches["competition_id"].isin(ids)] if not base.matches.empty else base.matches
     match_ids = set(matches["id"]) if not matches.empty else set()
-    deliveries = (base.deliveries[base.deliveries["competition_id"].isin(ids)]
-                  if not base.deliveries.empty else base.deliveries)
-    innings = set(deliveries["innings_id"]) if not deliveries.empty else set()
+    deliveries = load_deliveries(scope.competition_ids, base.matches)
+    log.info("scope %s: %s deliveries", list(scope.slugs), len(deliveries))
     view = Dataset(
         deliveries=deliveries,
-        positions=base.positions[base.positions["innings_id"].isin(innings)],
+        positions=batting_positions(deliveries),
         matches=matches,
         # The player registry stays whole so names always resolve; search and
         # directories are limited to the scope through squads and deliveries.
@@ -364,9 +543,13 @@ def scoped(scope: Scope, base: Optional[Dataset] = None) -> Dataset:
         scope=scope,
     )
     with _lock:
-        if len(_scoped) >= _SCOPE_CACHE_SIZE:
-            _scoped.pop(next(iter(_scoped)))
         _scoped[key] = view
+        rows = sum(len(d.deliveries) for d in _scoped.values())
+        # Always keep what was just read, however big it is: the request that
+        # paid for it is about to use it.
+        while len(_scoped) > 1 and rows > _SCOPE_ROW_BUDGET:
+            evicted = _scoped.pop(next(iter(_scoped)))  # insertion order == least recently used
+            rows -= len(evicted.deliveries)
     return view
 
 

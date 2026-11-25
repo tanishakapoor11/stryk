@@ -67,6 +67,13 @@ def main() -> int:
     )
     for w in stats.warnings[:20]:
         print("  warn:", w)
+
+    # The home page needs one figure over every competition at once. Building it
+    # here - a full scan of the ball table - keeps it off the first page load.
+    from app.analytics import store
+
+    store._totals_path().unlink(missing_ok=True)
+    print(f"ball totals cached: {int(store.ball_totals()['balls'].sum())} deliveries")
     return 0
 
 
