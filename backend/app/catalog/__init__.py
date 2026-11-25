@@ -77,9 +77,19 @@ def validate(cat: dict) -> dict:
             raise CatalogueError(f"{where}: unknown points system {c['points_system']!r}")
         if c["season_naming"] not in ("calendar_year", "source_label"):
             raise CatalogueError(f"{where}: bad season_naming")
+        if "prominence" in c and c["prominence"] not in (1, 2, 3, 4, 5):
+            raise CatalogueError(f"{where}: prominence must be 1-5, got {c['prominence']!r}")
+        season = c.get("first_season")
+        if season is not None and not (isinstance(season, int) and 1800 <= season <= 2100):
+            raise CatalogueError(f"{where}: first_season must be a year, got {season!r}")
         for rule in c.get("match", []):
             if "dataset" in rule and (rule["provider"], rule["dataset"]) not in dataset_keys:
                 raise CatalogueError(f"{where}: dataset {rule['dataset']!r} not in sources.json")
+            if "event" in rule and rule.get("match_type") and c["formats"] \
+                    and rule["match_type"] not in c["formats"]:
+                raise CatalogueError(
+                    f"{where}: event rule format {rule['match_type']!r} is not in formats"
+                )
             if rule.get("gender") and rule["gender"] not in GENDERS:
                 raise CatalogueError(f"{where}: bad rule gender")
         if not c.get("match") and not c.get("unavailable_reason"):
@@ -171,7 +181,12 @@ def _rule_matches(rule: dict, ctx: MatchContext, kind: str) -> bool:
     if rule.get("gender") and rule["gender"] != ctx.gender:
         return False
     if kind == "event":
-        return "event" in rule and rule["event"] == ctx.event_name
+        if "event" not in rule or rule["event"] != ctx.event_name:
+            return False
+        # One event name can cover more than one format: the men's Asia Cup is
+        # "Asia Cup" whether it is played as ODIs or T20s, and the two are
+        # separate competitions here because no analysis may pool formats.
+        return rule.get("match_type") in (None, ctx.match_type)
     if kind == "dataset":
         return ("dataset" in rule and rule["dataset"] == ctx.dataset
                 and rule.get("provider", "cricsheet") == ctx.provider)

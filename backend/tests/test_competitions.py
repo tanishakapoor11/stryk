@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, select, text, update
 from sqlalchemy.orm import Session
 
 from app import catalog
@@ -37,6 +37,105 @@ def test_catalogue_is_valid_and_complete():
         assert c["match"] or c.get("unavailable_reason"), c["slug"]
 
 
+def test_every_catalogued_competition_is_ranked_for_display():
+    """Lists are ordered by prominence, so an unranked competition would sort
+    behind the auto-created one-match tours - which is right for those, and
+    wrong for anything curated."""
+    from app.analytics.competitions import UNRANKED, prominence
+
+    ranks = prominence()
+    for c in catalog.catalogue()["competitions"]:
+        assert ranks.get(c["slug"]) is not None, f"{c['slug']} has no prominence"
+        assert ranks[c["slug"]] < UNRANKED
+
+
+@pytest.mark.parametrize("ahead, behind", [
+    ("ipl", "npl"),                       # the complaint that prompted the ranking
+    ("ipl", "bbl"),
+    ("bbl", "ilt20"),
+    ("mens-t20is", "womens-tests"),
+    ("icc-mens-cricket-world-cup", "icc-u19-mens-cricket-world-cup"),
+    ("county-championship", "bob-willis-trophy"),
+])
+def test_prominence_order(ahead, behind):
+    from app.analytics.competitions import prominence
+
+    ranks = prominence()
+    assert ranks[ahead] < ranks[behind], f"{ahead} should rank ahead of {behind}"
+
+
+@pytest.mark.parametrize("slug, first_match, expected", [
+    ("ipl", "2008-04-18", True),            # the IPL began in 2008; every ball is held
+    ("mens-t20is", "2005-02-17", True),     # the first men's T20I was 17 Feb 2005
+    ("mens-tests", "2001-12-19", False),    # Test cricket dates from 1877
+    ("county-championship", "2014-04-06", False),
+    ("one-day-cup-england", "2014-07-26", None),   # lineage ambiguous: no claim
+    ("not-a-competition", "2014-01-01", None),     # uncatalogued: no claim
+    ("ipl", None, None),                           # nothing ingested yet
+])
+def test_coverage_is_complete_only_where_the_data_reaches_the_first_season(
+    slug, first_match, expected
+):
+    """A most-runs list is the competition's real order only where STRYK holds
+    every season. Where it does not, the list ranks players by how much of
+    their career falls inside the data - which is why Tendulkar is not top of
+    the Test runs - so the interface withholds it."""
+    from app.analytics.competitions import coverage_is_complete
+
+    assert coverage_is_complete(slug, first_match) is expected
+
+
+def test_a_competitions_first_season_is_never_after_its_data():
+    """A founding year later than the first indexed match would mean one of
+    the two is wrong, and would wrongly mark the competition as complete."""
+    from app.analytics import competitions as service
+    from app.analytics import store
+
+    ds = store.get()
+    if ds.competitions.empty:
+        pytest.skip("no ingested data")
+    firsts = service.first_seasons()
+    for cid, row in ds.competitions.iterrows():
+        began = firsts.get(row["slug"])
+        m = ds.matches[ds.matches["competition_id"] == cid]
+        if began is None or m.empty:
+            continue
+        played = int(m["date"].min().year)
+        assert began <= played, (
+            f"{row['slug']}: catalogue says it began in {began} but the data starts {played}"
+        )
+
+
+def test_one_event_name_can_be_two_competitions_when_the_format_differs():
+    """The men's Asia Cup is called "Asia Cup" whether it is played as ODIs or
+    T20s, and no analysis may pool formats, so the event rule has to be able
+    to tell them apart."""
+    odi = resolve(MatchContext("Asia Cup", "MEN", "ODI", None), COMPS)
+    t20 = resolve(MatchContext("Asia Cup", "MEN", "T20", None), COMPS)
+    assert odi["slug"] == "asia-cup"
+    assert t20["slug"] == "mens-t20-asia-cup"
+
+
+def test_twenty_over_internationals_are_one_format_however_the_source_marks_them():
+    """Cricsheet writes "IT20" for a twenty-over international between
+    associate members and "T20" when a full member plays. They are the same
+    format, and the Asian Games - which has both - must not be refused as a
+    scope spanning two."""
+    from app.analytics.store import canonical_format
+
+    assert canonical_format("IT20") == canonical_format("T20") == "T20"
+    assert canonical_format("ODI") == "ODI"
+    assert canonical_format(None) is None
+
+
+def test_an_event_rule_claims_every_format_it_does_not_name():
+    """A rule without a match_type takes the whole event; one with a
+    match_type takes only that format."""
+    asian_games = resolve(MatchContext("Asian Games Men's Cricket Competition", "MEN", "IT20", None), COMPS)
+    assert asian_games["slug"] == "asian-games-cricket-men"
+    assert resolve(MatchContext("Asia Cup", "MEN", "Test", None), COMPS) is None
+
+
 def test_women_have_their_own_competitions_not_a_filter():
     women = [c for c in catalog.catalogue()["competitions"] if c["gender"] == "WOMEN"]
     types = {c["type"] for c in women}
@@ -49,6 +148,8 @@ def test_women_have_their_own_competitions_not_a_filter():
     (lambda c: c["competitions"][0].update(match=[], unavailable_reason=None), "needs a match rule"),
     (lambda c: c["points_systems"][0].update(tie_breakers=["points", "coin_toss"]), "unknown tie-breakers"),
     (lambda c: c["competitions"][0].update(match=[{"provider": "cricsheet", "dataset": "nope"}]), "not in sources"),
+    (lambda c: c["competitions"][0].update(prominence=0), "prominence must be 1-5"),
+    (lambda c: c["competitions"][0].update(prominence="1"), "prominence must be 1-5"),
 ])
 def test_catalogue_validation_rejects_bad_data(mutate, message):
     cat = copy.deepcopy(catalog.catalogue())
@@ -283,6 +384,46 @@ def mixed_db(db_engine, tmp_path):
 
 
 # --------------------------------------------------------- integration tests
+def test_relink_leaves_bilateral_matches_where_they_are(mixed_db):
+    """The re-link moves a match only when a catalogue event rule names its
+    event. A bilateral tour ("Nation tour of Other") is not a competition of
+    its own, and a rule that started claiming those would quietly empty the
+    men's T20I record into hundreds of two-match "competitions"."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+    import relink
+
+    with Session(mixed_db) as db:
+        _, moves = relink.plan(db)
+    assert moves == [], f"nothing here should move, got {[(m[2], m[3]) for m in moves]}"
+
+
+def test_relink_moves_a_match_an_event_rule_now_claims(mixed_db):
+    """Ingest skips matches it has already imported, so a rule added to the
+    catalogue later never moves the matches it now owns. That is why the Asia
+    Cup sat inside Men's ODIs: the re-link is what closes the gap."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+    import relink
+    from app.models import Competition, Match
+
+    with Session(mixed_db) as db:
+        # Put a men's T20I where an "Asia Cup" rule will disagree with it.
+        wrong = db.execute(select(Competition.id).where(Competition.slug == "mens-t20is")).scalar()
+        match_id = db.execute(
+            select(Match.id).where(Match.event_name == "Nation tour of Other")
+        ).scalar()
+        db.execute(update(Match).where(Match.id == match_id)
+                   .values(event_name="Asia Cup", competition_id=wrong))
+        db.flush()
+
+        _, moves = relink.plan(db)
+        assert len(moves) == 1, moves
+        _row, _ctx, src, dst = moves[0]
+        # A T20 "Asia Cup" is the T20 competition, never the ODI one.
+        assert (src, dst) == ("mens-t20is", "mens-t20-asia-cup")
+
+
 def test_matches_link_to_competitions_seasons_and_stages(mixed_db):
     with mixed_db.connect() as c:
         rows = dict(c.execute(text(

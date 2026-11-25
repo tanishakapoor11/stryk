@@ -7,10 +7,13 @@ deliveries from another competition.
 
 from __future__ import annotations
 
+import re
+from functools import lru_cache
 from typing import Dict, List, Optional
 
 import pandas as pd
 
+from app import catalog
 from app.analytics import overview, standings, store
 from app.analytics.store import Dataset, Filters
 
@@ -26,6 +29,58 @@ COVERAGE_LABELS = {
     "unavailable": "No data source",
 }
 _LEVEL_STATUS = {5: "ball_by_ball", 4: "ball_by_ball", 3: "detailed", 2: "scorecard", 1: "metadata"}
+
+#: Where an uncatalogued competition sorts: behind every curated tier. Ingest
+#: invents one of these for any match no catalogue rule claims - a single
+#: bilateral tour, a regional qualifier - and there are more of them than there
+#: are real competitions.
+UNRANKED = 9
+
+
+@lru_cache(maxsize=1)
+def first_seasons() -> Dict[str, int]:
+    """The year each competition began - not the year its data begins.
+
+    Cricsheet publishes deliveries, and the earliest are from 2001, so a
+    competition older than that is in STRYK only from where the ball-by-ball
+    record starts. Comparing the two years is the only way to tell a complete
+    record (every IPL season) from a partial one (Test cricket since 2001),
+    and cumulative lists like most runs are honest only for the first.
+    Competitions whose lineage is ambiguous carry no year and count as partial.
+    """
+    return {c["slug"]: int(c["first_season"]) for c in catalog.catalogue()["competitions"]
+            if c.get("first_season")}
+
+
+def coverage_is_complete(slug: str, first_match: Optional[str]) -> Optional[bool]:
+    """Whether STRYK holds every season a competition has played.
+
+    None where it cannot be told: an uncatalogued competition, or one whose
+    first season is not established.
+    """
+    began = first_seasons().get(slug)
+    if began is None or not first_match:
+        return None
+    return int(first_match[:4]) <= began
+
+
+@lru_cache(maxsize=1)
+def prominence() -> Dict[str, int]:
+    """How prominent each competition is, 1 (headline) to 5 (niche).
+
+    How much interest a competition holds is an editorial judgement, not
+    something the ball-by-ball data can be asked: the County Championship plays
+    more matches than the IPL. So it is curated in competitions.json beside the
+    rest of the competition metadata, and every list here is ordered by it.
+    """
+    return {c["slug"]: int(c["prominence"]) for c in catalog.catalogue()["competitions"]
+            if c.get("prominence")}
+
+
+def rank(c: dict) -> int:
+    """The sort rank of a card or any dict carrying a ``slug``."""
+    return prominence().get(c["slug"], UNRANKED)
+
 
 FIXTURES_UNAVAILABLE = (
     "Upcoming and live fixtures are not available: the only data source in use (Cricsheet) "
@@ -98,26 +153,58 @@ def coverage(ds: Dataset, comp_id: int) -> dict:
         else:
             status, detail = "unavailable", "No data source is mapped to this competition."
         return {"status": status, "label": COVERAGE_LABELS[status], "detail": detail,
-                "matches": 0, "seasons": 0, "data_levels": [], "sources": sources}
+                "matches": 0, "seasons": 0, "data_levels": [], "sources": sources,
+                "begins": first_seasons().get(comp["slug"]), "complete": None}
     levels = sorted({int(x) for x in m["data_level"].dropna()})
     status = _LEVEL_STATUS.get(levels[0], "metadata") if len(levels) == 1 else "mixed"
+    first_match = m["date"].min().date().isoformat()
     return {
         "status": status,
         "label": COVERAGE_LABELS[status],
         "detail": None,
         "matches": int(len(m)),
         "seasons": int(m["season_id"].nunique()),
-        "first_match": m["date"].min().date().isoformat(),
+        "first_match": first_match,
         "last_match": m["date"].max().date().isoformat(),
         "data_levels": levels,
         "sources": sources,
+        #: The competition's own first season, and whether STRYK holds all of
+        #: it. A career total is only a career total when ``complete``.
+        "begins": first_seasons().get(comp["slug"]),
+        "complete": coverage_is_complete(comp["slug"], first_match),
+    }
+
+
+def scope_coverage(ds: Dataset) -> dict:
+    """Whether the scope in view is a complete record of its competitions.
+
+    Cumulative lists - most runs, most wickets - are a competition's real
+    all-time order only when STRYK holds every season it has played. Where it
+    does not, the top of the list is whoever played most recently rather than
+    whoever scored most, and the interface drops the list instead of implying
+    an order it cannot support. A scope of several competitions is complete
+    only if every one of them is.
+    """
+    ids = list(ds.scope.competition_ids) if ds.scope else []
+    covs = [coverage(ds, cid) for cid in ids]
+    flags = [c["complete"] for c in covs]
+    firsts = [int(c["first_match"][:4]) for c in covs if c.get("first_match")]
+    begins = [c["begins"] for c in covs if c.get("begins")]
+    return {
+        # None - not false - where it cannot be told, so the interface can say
+        # "unknown" rather than assert a competition is missing seasons.
+        "complete": all(flags) if flags and None not in flags else None,
+        "begins": min(begins) if begins else None,
+        "indexed_from": min(firsts) if firsts else None,
+        "indexed_to": max((int(c["last_match"][:4]) for c in covs if c.get("last_match")),
+                          default=None),
     }
 
 
 def _formats(ds: Dataset, comp_id: int, declared) -> List[str]:
     m = ds.matches[ds.matches["competition_id"] == comp_id] if not ds.matches.empty else ds.matches
-    seen = sorted(set(m["match_type"])) if not m.empty else []
-    return sorted(set(declared or []) | set(seen))
+    seen = {store.canonical_format(x) for x in m["match_type"]} if not m.empty else set()
+    return sorted({store.canonical_format(x) for x in (declared or [])} | seen)
 
 
 def _seasons_of(ds: Dataset, comp_id: int) -> pd.DataFrame:
@@ -204,10 +291,11 @@ def directory(
                 return False
         return True
 
-    rank = {"ball_by_ball": 0, "detailed": 1, "scorecard": 2, "mixed": 3, "results": 4,
-            "metadata": 5, "not_ingested": 6, "unavailable": 7}
-    kept = sorted(filter(keep, cards), key=lambda c: (rank[c["coverage"]["status"]],
-                                                       not c["is_active"], c["name"]))
+    coverage_rank = {"ball_by_ball": 0, "detailed": 1, "scorecard": 2, "mixed": 3, "results": 4,
+                     "metadata": 5, "not_ingested": 6, "unavailable": 7}
+    kept = sorted(filter(keep, cards),
+                  key=lambda c: (coverage_rank[c["coverage"]["status"]], rank(c),
+                                 not c["is_active"], -c["coverage"]["matches"], c["name"]))
 
     def facet(key_fn) -> Dict[str, int]:
         out: Dict[str, int] = {}
@@ -257,6 +345,60 @@ def find_season(ds: Dataset, comp_id: int, key: str) -> Optional[int]:
     if key.isdigit() and int(key) in s.index:
         return int(key)
     return None
+
+
+#: A year anywhere in a search box: "asia cup 2023", "2016 world t20".
+_YEAR = re.compile(r"\b(1[89]\d{2}|20\d{2})\b")
+
+
+def names_a_year(q: str) -> bool:
+    """Whether a search query picks out one edition, as "asia cup 2023" does."""
+    return bool(_YEAR.search(q))
+
+
+def search_seasons(ds: Dataset, q: str, limit: int = 6) -> List[dict]:
+    """Seasons matching a query that names a competition, usually with a year.
+
+    "Asia Cup 2023" is a question about one tournament, and without this it
+    finds nothing at all: no competition is named "Asia Cup 2023", so the
+    competition search fails on the year and the reader is told there are no
+    results for an edition STRYK holds in full. The year picks the edition and
+    the remaining words pick the competition; a year on its own lists that
+    season of every competition, most prominent first.
+
+    Seasons with no matches are dropped - a result that opens an empty page is
+    worse than one fewer result.
+    """
+    comps, seasons = ds.competitions, ds.seasons
+    if comps.empty or seasons.empty:
+        return []
+    years = {int(y) for y in _YEAR.findall(q)}
+    text = re.sub(r"\s+", " ", _YEAR.sub(" ", q)).strip().lower()
+    if text:
+        hay = (comps["name"].fillna("") + " " + comps["short_name"].fillna("")
+               + " " + comps["slug"].fillna("")).str.lower()
+        ids = set(comps.index[hay.str.contains(re.escape(text), regex=True)])
+    elif years:
+        ids = set(comps.index)
+    else:
+        return []
+    rows = seasons[seasons["competition_id"].isin(ids)]
+    if years:
+        rows = rows[rows["year"].isin(years)]
+    if rows.empty:
+        return []
+    played = ds.matches.groupby("season_id").size() if not ds.matches.empty else None
+    out = []
+    for sid, r in rows.iterrows():
+        cid = int(r["competition_id"])
+        n = int(played.get(sid, 0)) if played is not None else 0
+        if not n:
+            continue
+        out.append({"competition_id": cid, "slug": comps.at[cid, "slug"],
+                    "competition": comps.at[cid, "name"], "season": str(r["name"]),
+                    "year": int(r["year"]), "matches": n})
+    out.sort(key=lambda x: (rank(x), -x["year"]))
+    return out[:limit]
 
 
 def season_slug(name: str) -> str:
@@ -514,7 +656,9 @@ def global_summary(base: Dataset, recent: int = 10) -> dict:
         return {"competitions": {"catalogued": 0, "with_data": 0}, "matches": 0}
     with_data = sorted(set(m["competition_id"].dropna().astype(int))) if not m.empty else []
     cards = [card(base, cid) for cid in with_data]
+    # Most prominent first, then whichever played most recently (stable sort).
     cards.sort(key=lambda c: c["coverage"].get("last_match") or "", reverse=True)
+    cards.sort(key=rank)
 
     by_type: Dict[str, dict] = {}
     for cid, c in comps.iterrows():
@@ -539,7 +683,7 @@ def global_summary(base: Dataset, recent: int = 10) -> dict:
         },
         "matches": int(len(m)),
         "matches_by_gender": {g: int(n) for g, n in gender_of.value_counts().items()} if not m.empty else {},
-        "deliveries": int(len(base.deliveries)),
+        "deliveries": int(store.ball_totals()["balls"].sum()),
         "players": int(base.squads["player_id"].nunique()) if not base.squads.empty else 0,
         "teams": int(len(set(m["team1_id"]).union(m["team2_id"]))) if not m.empty else 0,
         "formats": sorted(set(m["match_type"])) if not m.empty else [],
@@ -552,17 +696,17 @@ def global_summary(base: Dataset, recent: int = 10) -> dict:
 
 
 def _suggestions(base: Dataset, cards: List[dict], count: int = 6) -> List[dict]:
-    """Top run-scorer of each of the busiest competitions, women's and men's alternating.
+    """Top run-scorer of each of the most prominent competitions, women's and men's alternating.
 
     Names to start a search from; each is the leader *within* one competition,
     so no record is combined across competitions.
     """
-    dv = base.deliveries
-    if dv.empty:
+    totals = store.ball_totals()
+    if totals.empty:
         return []
-    runs = dv[~dv["is_super_over"]].groupby(["competition_id", "batter_id"])["batter_runs"].sum()
-    busiest = sorted(cards, key=lambda c: -c["coverage"]["matches"])
-    queues = [[c for c in busiest if c["gender"] == g] for g in ("MEN", "WOMEN")]
+    runs = totals.set_index(["competition_id", "batter_id"])["runs"]
+    ranked = sorted(cards, key=lambda c: (rank(c), -c["coverage"]["matches"]))
+    queues = [[c for c in ranked if c["gender"] == g] for g in ("MEN", "WOMEN")]
     ordered = [c for pair in zip(*queues) for c in pair] + queues[0][len(queues[1]):] + queues[1][len(queues[0]):]
     out, seen = [], set()
     for c in ordered:

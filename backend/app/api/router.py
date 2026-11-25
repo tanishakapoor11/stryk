@@ -34,7 +34,7 @@ NO_DATA = "No data has been ingested yet. Run scripts/fetch_cricsheet.py then sc
 def _base():
     """The whole database: for discovery, search and catalogue views."""
     ds = store.get()
-    if ds.competitions.empty and ds.is_empty:
+    if ds.competitions.empty and ds.matches.empty:
         raise HTTPException(503, NO_DATA)
     return ds
 
@@ -46,7 +46,7 @@ def _ds(competition: Optional[List[str]] = None):
     deliveries across competitions of different genders or formats.
     """
     base = store.get()
-    if base.is_empty:
+    if base.matches.empty:
         raise HTTPException(503, NO_DATA)
     try:
         return store.scoped(store.resolve_scope(base, competition), base)
@@ -134,7 +134,71 @@ def global_search(q: str = Query(..., min_length=2), limit: int = Query(12, le=5
         out.append({"type": "competition", "id": c["slug"], "name": c["name"],
                     "secondary": c["short_name"], "detail": c["coverage"]["label"],
                     "href": f"/competitions/{c['slug']}"})
+    seasons = [
+        {"type": "season", "id": f"{s['slug']}/{competition_service.season_slug(s['season'])}",
+         "name": f"{s['competition']} {s['season']}", "secondary": s["competition"],
+         "detail": f"{s['matches']} matches",
+         "href": f"/competitions/{s['slug']}/{competition_service.season_slug(s['season'])}"}
+        for s in competition_service.search_seasons(ds, q, limit=6)
+    ]
+    # A query carrying a year names one edition, so that edition leads: a
+    # reader who typed "asia cup 2023" wants the 2023 tournament, not the
+    # competition's landing page or a player whose name happens to match.
+    out = seasons + out if competition_service.names_a_year(q) else out + seasons
+
+    # An exactly named competition leads whatever else matched. Player names
+    # are searched by substring, so "ipl" otherwise returns three players
+    # called Shipley, Chipli and Samantray before the Indian Premier League.
+    def names_exactly(hit) -> bool:
+        if hit["type"] not in ("competition", "season"):
+            return False
+        return ql in {name_service.normalise(str(hit["id"])),
+                      name_service.normalise(hit["name"]),
+                      name_service.normalise(hit["secondary"] or "")}
+
+    exact = [h for h in out if names_exactly(h)]
+    if exact:
+        rest = [h for h in out if not names_exactly(h)]
+        out = exact + rest
     return out[: limit + 12]
+
+
+@router.get("/sitemap", tags=["meta"])
+def sitemap():
+    """Every indexable entity, for the frontend's sitemap.xml.
+
+    One call rather than one per competition: this reads only the reference
+    tables, which are in memory already, and never touches the ball table.
+
+    Players are returned with their appearance count so the sitemap can leave
+    out one-match entries - thousands of near-empty pages are worth less to a
+    search engine than the few hundred people actually look for.
+    """
+    ds = _base()
+    comps = ds.competitions
+    seasons, competitions = [], []
+    for cid, c in comps.iterrows():
+        m = ds.matches[ds.matches["competition_id"] == cid] if not ds.matches.empty else ds.matches
+        if m.empty:
+            continue
+        last = m["date"].max().date().isoformat()
+        competitions.append({"slug": c["slug"], "last_match": last})
+        rows = ds.seasons[ds.seasons["competition_id"] == cid] if not ds.seasons.empty else ds.seasons
+        for sid, s in rows.iterrows():
+            sm = m[m["season_id"] == sid]
+            if sm.empty:
+                continue
+            seasons.append({"competition": c["slug"],
+                            "season": competition_service.season_slug(str(s["name"])),
+                            "last_match": sm["date"].max().date().isoformat()})
+    played = (ds.squads.groupby("player_id")["match_id"].nunique()
+              if not ds.squads.empty else None)
+    players = ([{"id": pid, "matches": int(n)} for pid, n in played.items()]
+               if played is not None else [])
+    teams = [{"id": int(tid)} for tid in sorted(set(ds.matches["team1_id"]).union(
+        ds.matches["team2_id"]))] if not ds.matches.empty else []
+    return {"competitions": competitions, "seasons": seasons,
+            "teams": teams, "players": players}
 
 
 # ---------------------------------------------------------------- overview
@@ -147,6 +211,7 @@ def overview(
     ds = _ds(competition)
     return {
         "scope": ds.scope.describe(),
+        "coverage": competition_service.scope_coverage(ds),
         "summary": overview_service.summary(ds, f),
         "leaderboards": overview_service.leaderboards(ds, f, limit),
         "trends": overview_service.season_trends(ds, f),
@@ -400,5 +465,6 @@ def season_statistics(key: str, season: str, limit: int = Query(10, ge=3, le=50)
 def reload_dataset():
     """Re-read the fact table after an ingestion run."""
     ds = store.reload()
-    return {"status": "reloaded", "deliveries": int(len(ds.deliveries)),
+    return {"status": "reloaded", "matches": int(len(ds.matches)),
+            "deliveries": int(store.ball_totals()["balls"].sum()),
             "loaded_at": ds.loaded_at.isoformat() + "Z"}
