@@ -295,15 +295,30 @@ def compare(
     competition: Optional[List[str]] = Depends(scope_params),
 ):
     """Side-by-side profiles on an identical sample. The UI decides what is
-    meaningful; the API never declares a winner."""
-    ds = _ds(competition)
+    meaningful; the API never declares a winner.
+
+    Without an explicit ``competition`` the scope is the busiest competition
+    every selected player has played in, not the site-wide default: comparing
+    an IPL record against a blank IPL record because one of the two has never
+    played there is not a comparison. ``competitions`` lists the rest of the
+    common ground so the UI can switch, and is empty when there is none.
+    """
+    ids = players[:4]
+    options = competition_service.shared_competitions(store.get(), ids)
+    scope = competition or ([options[0]["slug"]] if options else None)
+    ds = _ds(scope)
     out = []
-    for pid in players[:4]:
+    for pid in ids:
         profile = player_service.profile(ds, pid, f)
         if profile is None:
+            # Reachable only by a hand-written competition= in the URL: the
+            # switcher never offers a competition one of them has not played.
+            if pid in store.get().players.index:
+                raise HTTPException(422, f"{pid!r} has no record in this competition")
             raise HTTPException(404, f"No player with id {pid!r}")
         out.append(profile)
-    return {"players": out, "filters": f.describe(), "scope": ds.scope.describe()}
+    return {"players": out, "filters": f.describe(), "scope": ds.scope.describe(),
+            "competitions": options}
 
 
 # ---------------------------------------------------------------- matchups

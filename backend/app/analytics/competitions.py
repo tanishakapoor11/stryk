@@ -643,6 +643,26 @@ def entity_competitions(base: Dataset, *, player_id: Optional[str] = None,
     return sorted(out, key=lambda x: -x["matches"])
 
 
+def shared_competitions(base: Dataset, player_ids: List[str]) -> List[dict]:
+    """Competitions every one of these players has a record in, busiest first.
+
+    A comparison needs common ground: two players are only comparable inside a
+    competition they have both played. ``matches`` on each option is the
+    SMALLEST of the players' match counts there, because a side-by-side is
+    only as deep as the thinnest record in it — quoting the larger number
+    would advertise a sample the comparison does not have.
+
+    An empty list means these players share no competition. That is an
+    answer, not a failure: nothing honest can be put side by side.
+    """
+    if not player_ids:
+        return []
+    per = [{c["slug"]: c for c in entity_competitions(base, player_id=pid)} for pid in player_ids]
+    common = set(per[0]).intersection(*(set(d) for d in per[1:]))
+    out = [dict(per[0][slug], matches=min(d[slug]["matches"] for d in per)) for slug in common]
+    return sorted(out, key=lambda x: -x["matches"])
+
+
 def global_summary(base: Dataset, recent: int = 10) -> dict:
     """Totals across every competition, for the home page.
 

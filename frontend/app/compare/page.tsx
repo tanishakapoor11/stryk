@@ -21,14 +21,18 @@ import {
 import { SERIES } from "@/components/charts/theme";
 import { AnalysisTabs } from "@/features/players/analysis-tabs";
 import { Contenders } from "@/features/compare/contenders";
+import { CompetitionSwitcher } from "@/components/competitions/competition-switcher";
 import { dec, num, pct } from "@/lib/format";
-import type { PlayerProfile, SeasonMeta } from "@/types";
+import type { EntityCompetition, PlayerProfile, Scope, SeasonMeta } from "@/types";
 
 export const metadata = { title: "Player Comparison" };
 
 interface ComparePayload {
   players: PlayerProfile[];
   filters: Record<string, unknown>;
+  scope?: Scope;
+  /** Competitions every selected player has played in. Empty = no overlap. */
+  competitions: EntityCompetition[];
 }
 
 export default async function ComparePage({ searchParams }: { searchParams: RawParams }) {
@@ -37,13 +41,17 @@ export default async function ComparePage({ searchParams }: { searchParams: RawP
   let seasons: SeasonMeta[];
   let data: ComparePayload | null = null;
   try {
-    seasons = await api<SeasonMeta[]>("/api/meta/seasons");
     if (ids.length) {
       data = await api<ComparePayload>("/api/compare", {
         ...filterQuery(searchParams),
         player: ids,
       });
     }
+    // Seasons come second because the comparison chooses the competition when
+    // the URL does not, and 2008-2026 is the IPL's calendar, not cricket's.
+    seasons = await api<SeasonMeta[]>("/api/meta/seasons", {
+      competition: data?.scope?.competitions,
+    });
   } catch (err) {
     const e = err as ApiError;
     return (
@@ -88,6 +96,20 @@ export default async function ComparePage({ searchParams }: { searchParams: RawP
               ))}
             </div>
           </PanelBody>
+          {players.length > 1 && data?.competitions.length ? (
+            <PanelBody className="border-t border-line">
+              <CompetitionSwitcher
+                options={data.competitions}
+                current={data.scope?.competitions[0]}
+                // Only the players survive the switch: a season filter means
+                // something different in another competition, and most of
+                // these seasons do not exist in the one being moved to.
+                basePath={`/compare?${ids.map((id) => `player=${id}`).join("&")}`}
+                label="Common ground"
+                singleAsText={false}
+              />
+            </PanelBody>
+          ) : null}
         </Panel>
 
         {players.length === 0 ? (
@@ -104,34 +126,31 @@ export default async function ComparePage({ searchParams }: { searchParams: RawP
               detail={`${players[0].player.name} is selected. A comparison needs at least two.`}
             />
           </Panel>
+        ) : !data?.competitions.length ? (
+          <Panel>
+            <EmptyState
+              title="No competition in common"
+              detail={`${names(players)} have never played in the same competition. Records are never pooled across genders or formats, so there is no sample they can all be measured on — each player's own profile holds their record on its own terms.`}
+            />
+          </Panel>
         ) : (
           <>
             <Contenders players={players} />
 
-            <div className="grid min-w-0 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-              {anyBatting ? (
-                <Panel>
-                  <PanelHeader title="Batting" description="Career totals under the current filters." />
-                  <ComparisonTable
-                    players={players}
-                    rows={BATTING_ROWS}
-                    colors={colors}
-                    title="Batting metric"
-                  />
-                </Panel>
-              ) : null}
-              {anyBowling ? (
-                <Panel>
-                  <PanelHeader title="Bowling" description="Career totals under the current filters." />
-                  <ComparisonTable
-                    players={players}
-                    rows={BOWLING_ROWS}
-                    colors={colors}
-                    title="Bowling metric"
-                  />
-                </Panel>
-              ) : null}
-            </div>
+            <Panel>
+              <PanelHeader
+                title="Head to head"
+                description="One row per metric, one column per player, under the current filters. Batting and bowling are sections of the same table — every row covers everyone selected."
+              />
+              <ComparisonTable
+                players={players}
+                colors={colors}
+                sections={[
+                  ...(anyBatting ? [{ title: "Batting", rows: BATTING_ROWS }] : []),
+                  ...(anyBowling ? [{ title: "Bowling", rows: BOWLING_ROWS }] : []),
+                ]}
+              />
+            </Panel>
 
             <Panel>
               <AnalysisTabs
@@ -241,6 +260,12 @@ export default async function ComparePage({ searchParams }: { searchParams: RawP
       </Section>
     </>
   );
+}
+
+/** "A and B", "A, B and C" — the Oxford comma is not used elsewhere in the UI. */
+function names(players: PlayerProfile[]): string {
+  const all = players.map((p) => p.player.name);
+  return all.length < 2 ? (all[0] ?? "") : `${all.slice(0, -1).join(", ")} and ${all.at(-1)}`;
 }
 
 /** Batting first vs chasing, one row per player per situation. */

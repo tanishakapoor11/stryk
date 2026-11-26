@@ -547,6 +547,38 @@ def test_api_scoping_and_profile_competitions(mixed_db):
     assert t20i["scope"]["competitions"] == ["mens-t20is"]
 
 
+def test_compare_scopes_itself_to_common_ground_not_the_default_competition(mixed_db):
+    """A comparison is only meaningful inside a competition both have played.
+
+    Defaulting to the site-wide competition would show one real record beside
+    a blank one and call that a comparison.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+
+    # Alpha1 plays IPL and men's T20Is; Nation2 only the T20I. The default
+    # competition is the IPL, and the comparison must not use it.
+    both = client.get("/api/compare?player=id-Alpha1&player=id-Nation2").json()
+    assert both["scope"]["competitions"] == ["mens-t20is"]
+    assert [c["slug"] for c in both["competitions"]] == ["mens-t20is"]
+
+    # Alpha1 and Beta1 share the IPL, which is also where Alpha1 has played most.
+    ipl = client.get("/api/compare?player=id-Alpha1&player=id-Beta1").json()
+    assert ipl["scope"]["competitions"] == ["ipl"]
+
+    # An explicit scope still wins over the shared default.
+    forced = client.get("/api/compare?player=id-Alpha1&player=id-Beta1&competition=mens-t20is")
+    assert forced.json()["scope"]["competitions"] == ["mens-t20is"]
+
+    # A men's and a women's player share nothing: an empty list, not a scope
+    # in which one of them is all zeroes.
+    none = client.get("/api/compare?player=id-Alpha1&player=id-AlphaW1").json()
+    assert none["competitions"] == []
+
+
 def test_competition_directory_and_coverage(mixed_db):
     from fastapi.testclient import TestClient
 

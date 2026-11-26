@@ -100,6 +100,9 @@ export const BOWLING_ROWS: MetricRow[] = [
     format: (v) => pct(v),
     better: "high",
   },
+  // Both of these read two numbers out of one profile, so the table renders
+  // them by label rather than through `get`.
+  { label: "Best figures", get: () => null, format: () => EMPTY },
   { label: "4w / 5w hauls", get: () => null, format: () => EMPTY },
 ];
 
@@ -114,26 +117,46 @@ function leaderIndex(players: PlayerProfile[], row: MetricRow): number | null {
   return values.indexOf(best);
 }
 
+export interface MetricSection {
+  title: string;
+  /** Shown beside the title in the band, for anything the rows cannot say. */
+  hint?: string;
+  rows: MetricRow[];
+}
+
+/**
+ * One table, every player a column, batting and bowling as banded sections of
+ * it. Two side-by-side tables read as one box per player — the names sit in
+ * each box's header, so the discipline heading above them looks like a label
+ * for a person. A single table cannot be misread that way: the names appear
+ * once, at the top, and every row underneath plainly spans all of them.
+ */
 export function ComparisonTable({
   players,
-  rows,
+  sections,
   colors,
-  title,
 }: {
   players: PlayerProfile[];
-  rows: MetricRow[];
+  sections: MetricSection[];
   colors: string[];
-  title: string;
 }) {
   return (
     <TableWrap>
       <Table>
         <thead>
           <tr>
-            <Th className="w-44">{title}</Th>
+            {/* The label column takes the slack so the player columns stay
+                narrow and adjacent — two values a metric apart are meant to be
+                read against each other, not across the page. */}
+            <Th className="w-full">Metric</Th>
             {players.map((p, i) => (
-              <Th key={p.player.id} numeric>
-                <span className="inline-flex items-center gap-2">
+              <Th key={p.player.id} numeric className="w-40">
+                <span
+                  // The name wears its chart colour, so a line in the graphs
+                  // below can be traced back to a column up here.
+                  className="inline-flex items-center gap-2 border-b-2 pb-1"
+                  style={{ borderColor: colors[i] }}
+                >
                   <PlayerAvatar
                     name={p.player.name}
                     team={p.player.teams[0]?.team_name}
@@ -143,7 +166,6 @@ export function ComparisonTable({
                   <Link
                     href={`/players/${p.player.id}`}
                     className="font-display text-xs font-semibold text-ink hover:text-accent"
-                    style={{ textDecorationColor: colors[i] }}
                   >
                     {p.player.name}
                   </Link>
@@ -152,48 +174,54 @@ export function ComparisonTable({
             ))}
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row) => {
-            const lead = leaderIndex(players, row);
-            return (
-              <Tr key={row.label}>
-                <Td className="text-ink-muted" title={row.hint}>
-                  {row.label}
-                </Td>
-                {players.map((p, i) => {
-                  const special =
-                    row.label === "4w / 5w hauls"
-                      ? `${num(p.bowling?.four_wicket_hauls)} / ${num(p.bowling?.five_wicket_hauls)}`
-                      : null;
-                  return (
-                    <Td
-                      key={p.player.id}
-                      numeric
-                      className={cn(lead === i && "font-medium text-accent")}
-                    >
-                      {special ?? row.format(row.get(p))}
-                    </Td>
-                  );
-                })}
-              </Tr>
-            );
-          })}
-        </tbody>
+        {sections.map((section) => (
+          <tbody key={section.title}>
+            <tr>
+              <th
+                scope="colgroup"
+                colSpan={players.length + 1}
+                className="border-y border-l-2 border-line-strong border-l-accent bg-surface-sunken px-3 py-2.5 text-left"
+              >
+                <span className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-ink">
+                  {section.title}
+                </span>
+                {section.hint ? (
+                  <span className="ml-2.5 text-2xs font-normal normal-case tracking-normal text-ink-faint">
+                    {section.hint}
+                  </span>
+                ) : null}
+              </th>
+            </tr>
+            {section.rows.map((row) => {
+              const lead = leaderIndex(players, row);
+              return (
+                <Tr key={row.label}>
+                  <Td className="text-ink-muted" title={row.hint}>
+                    {row.label}
+                  </Td>
+                  {players.map((p, i) => {
+                    const special =
+                      row.label === "4w / 5w hauls"
+                        ? `${num(p.bowling?.four_wicket_hauls)} / ${num(p.bowling?.five_wicket_hauls)}`
+                        : row.label === "Best figures"
+                          ? figures(p.bowling?.best_wickets, p.bowling?.best_runs)
+                          : null;
+                    return (
+                      <Td
+                        key={p.player.id}
+                        numeric
+                        className={cn(lead === i && "font-medium text-accent")}
+                      >
+                        {special ?? row.format(row.get(p))}
+                      </Td>
+                    );
+                  })}
+                </Tr>
+              );
+            })}
+          </tbody>
+        ))}
       </Table>
     </TableWrap>
-  );
-}
-
-/** Best bowling figures row, which needs two numbers per cell. */
-export function BestFiguresRow({ players }: { players: PlayerProfile[] }) {
-  return (
-    <Tr>
-      <Td className="text-ink-muted">Best figures</Td>
-      {players.map((p) => (
-        <Td key={p.player.id} numeric>
-          {figures(p.bowling?.best_wickets, p.bowling?.best_runs)}
-        </Td>
-      ))}
-    </Tr>
   );
 }

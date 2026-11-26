@@ -125,6 +125,11 @@ export default async function PlayerPage({
   const bowl = p.bowling;
   const hasBat = (bat?.balls ?? 0) > 0;
   const hasBowl = (bowl?.balls ?? 0) > 0;
+  // "Last innings" reads as a career fact, but every figure on this page is
+  // scoped to one competition — and the switcher saying which one is at the
+  // top, out of sight by the time the form tab is open. So the recency
+  // headings name the competition themselves.
+  const inScope = scopeName(p.scope?.competitions, p.competitions);
   // An over strip needs at least one over with enough balls to carry a rate.
   const ratedBatting = p.by_over?.some((o) => o.strike_rate !== null) ?? false;
   const ratedBowling = p.by_over?.some((o) => o.economy !== null) ?? false;
@@ -442,7 +447,7 @@ export default async function PlayerPage({
                   <PanelBody className="grid min-w-0 gap-5 lg:grid-cols-2 [&>*]:min-w-0">
                     {p.recent_innings.length ? (
                       <div>
-                        <p className="label-xs mb-2">Last innings with the bat</p>
+                        <p className="label-xs mb-2">Last innings with the bat{inScope ? ` in ${inScope}` : ""}</p>
                         <BallStripLegend className="mb-3" />
                         <ul className="space-y-2">
                           {p.recent_innings.map((i, idx) => (
@@ -473,7 +478,7 @@ export default async function PlayerPage({
                     ) : null}
                     {p.recent_spells.length ? (
                       <div>
-                        <p className="label-xs mb-2">Last spells with the ball</p>
+                        <p className="label-xs mb-2">Last spells with the ball{inScope ? ` in ${inScope}` : ""}</p>
                         <TableWrap>
                           <Table>
                             <thead>

@@ -12,12 +12,22 @@ export function CompetitionSwitcher({
   options,
   current,
   basePath,
+  label = "Showing",
+  singleAsText = true,
 }: {
   options: EntityCompetition[];
   current: string | undefined;
+  /** May already carry a query string; the competition is appended to it. */
   basePath: string;
+  label?: string;
+  /**
+   * A profile with one competition states it in a sentence — a toggle with
+   * nothing to toggle to is noise. Where the single option is itself the
+   * finding, as on the comparison page, pass false to keep the chip.
+   */
+  singleAsText?: boolean;
 }) {
-  if (options.length < 2) {
+  if (options.length < 2 && singleAsText) {
     const only = options[0];
     return only ? (
       <p className="text-2xs text-ink-faint">
@@ -31,13 +41,13 @@ export function CompetitionSwitcher({
   }
   return (
     <nav aria-label="Competition" className="flex flex-wrap items-center gap-1.5">
-      <span className="label-xs mr-1">Showing</span>
+      <span className="label-xs mr-1">{label}</span>
       {options.map((o) => {
         const active = o.slug === current;
         return (
           <Link
             key={o.slug}
-            href={`${basePath}?competition=${o.slug}`}
+            href={`${basePath}${basePath.includes("?") ? "&" : "?"}competition=${o.slug}`}
             aria-current={active ? "page" : undefined}
             className={cn(
               "rounded border px-2 py-1 text-2xs transition-colors",
