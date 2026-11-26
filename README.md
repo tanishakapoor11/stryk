@@ -478,6 +478,15 @@ easy to fake.
   `data/raw/auction/prices.csv` (`player_name,season,price_inr,team,source`); without it
   the module reports `prices_available: false` and the budget and value-per-rupee
   features stay switched off.
+- **Afghanistan is absent entirely.** Cricsheet withholds every Afghanistan men's match
+  and the whole Afghanistan Premier League as a matter of its own policy — 386 matches,
+  including 162 ODIs and 166 T20Is. This is a decision at the source, not a gap in the
+  ingest: the downloaded archives do not contain those files, and no amount of re-fetching
+  will produce them. Afghanistan carries a catalogue entry so it appears correctly the day
+  the policy changes, but until then it has no team, no players and no matches here. See
+  <https://cricsheet.org/withheld-matches>. Women's Afghanistan matches are unaffected,
+  and there are none in the data.
+
 - **Batting position is reconstructed** from the order players arrive at the crease, not
   read from a team sheet.
 - **Player role is inferred from workload** (300+ balls faced and 300+ bowled is an

@@ -11,7 +11,7 @@
    "limitations": [
     "Completed matches only: no upcoming fixtures, live scores or squads announced before a match.",
     "No player nationality, date of birth or playing role.",
-    "Some matches are withheld from downloads (counts below).",
+    "Afghanistan men's matches and the Afghanistan Premier League are withheld by Cricsheet as a matter of its own policy, so Afghanistan does not appear in this dataset at all: 386 matches in total, including 162 ODIs and 166 T20Is. See https://cricsheet.org/withheld-matches.",
     "No wagon-wheel, shot-location or fielding-position data (level 5)."
    ],
    "checked_on": "2026-11-24",
