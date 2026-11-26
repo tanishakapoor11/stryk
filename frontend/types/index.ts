@@ -266,6 +266,8 @@ export interface TeamSummary {
   id: number;
   name: string;
   short_name: Nullable<string>;
+  /** A national side's flag emoji; null for clubs and the composite XIs. */
+  flag: Nullable<string>;
   aliases: string[];
   matches: number;
   won: number;
@@ -278,7 +280,13 @@ export interface TeamSummary {
 export interface TeamProfile {
   scope?: Scope;
   competitions?: EntityCompetition[];
-  team: { id: number; name: string; short_name: Nullable<string>; aliases: string[] };
+  team: {
+    id: number;
+    name: string;
+    short_name: Nullable<string>;
+    flag: Nullable<string>;
+    aliases: string[];
+  };
   filters: Record<string, unknown>;
   record: { played: number; won: number; lost: number; no_result: number; win_pct: Nullable<number> };
   by_season: Array<{ season: number; played: number; won: number; lost: number; win_pct: Nullable<number> }>;

@@ -14,10 +14,11 @@ import type { TeamSummary } from "@/types";
  * most people will actually use this page.
  */
 export function TeamCard({ team, competition }: { team: TeamSummary; competition?: string }) {
-  const identity = teamIdentity(team.name);
+  const identity = teamIdentity(team.name, team.short_name);
   const winPct = team.win_pct ?? 0;
-  // Real artwork if the operator supplied it; otherwise the generated badge.
-  const logo = teamLogo(identity.short);
+  // Real artwork if the operator supplied it; otherwise a flag for a nation,
+  // otherwise the generated badge.
+  const logo = teamLogo(team.name, identity.short);
 
   return (
     <Link
@@ -42,7 +43,14 @@ export function TeamCard({ team, competition }: { team: TeamSummary; competition
       <div className="relative p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <TeamCrest team={team.name} size={44} logoSrc={logo} className="mt-0.5" />
+            <TeamCrest
+              team={team.name}
+              size={44}
+              logoSrc={logo}
+              flag={team.flag}
+              short={team.short_name}
+              className="mt-0.5"
+            />
             <div className="min-w-0">
             <div
               className="font-display text-2xl font-bold leading-none"

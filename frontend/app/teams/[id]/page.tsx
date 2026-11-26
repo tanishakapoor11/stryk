@@ -79,7 +79,7 @@ export default async function TeamPage({
   }
   if (!profile) notFound();
 
-  const identity = teamIdentity(profile.team.name);
+  const identity = teamIdentity(profile.team.name, profile.team.short_name);
   const chase = profile.innings_type.chasing;
   const set = profile.innings_type.setting;
 
@@ -117,16 +117,16 @@ export default async function TeamPage({
             items={[
               { label: "Stryk", href: "/" },
               { label: "Teams", href: "/teams" },
-              // Identity colours exist only for teams in lib/teams.ts; everyone
-              // else falls back to their own short name, never a placeholder.
-              { label: identity.short !== "—" ? identity.short : profile.team.short_name ?? profile.team.name },
+              { label: identity.short || profile.team.name },
             ]}
           />
           <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-4">
             <TeamCrest
               team={profile.team.name}
               size={84}
-              logoSrc={teamLogo(identity.short)}
+              logoSrc={teamLogo(profile.team.name, identity.short)}
+              flag={profile.team.flag}
+              short={profile.team.short_name}
               className="shrink-0"
             />
             <div className="min-w-0">

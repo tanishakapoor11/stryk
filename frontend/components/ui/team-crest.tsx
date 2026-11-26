@@ -27,7 +27,31 @@ type Emblem =
   | "darwaza"    // Rumi Darwaza, Lucknow
   | "kite"       // Uttarayan kites, Gujarat
   | "fishingnet" // Chinese fishing nets, Kochi
-  | "fort";      // Shaniwar Wada, Pune
+  | "fort"        // Shaniwar Wada, Pune / Bala Hisar, Peshawar
+  // Big Bash
+  | "operahouse"  // Sydney Opera House
+  | "harbourbr"   // Sydney Harbour Bridge
+  | "spire"       // Arts Centre spire, Melbourne
+  | "clocktower"  // Flinders Street Station, Melbourne
+  | "belltower"   // Swan Bell Tower, Perth
+  | "cathedral"   // St Peter's twin spires, Adelaide
+  | "storybridge" // Story Bridge, Brisbane
+  | "mountain"    // kunanyi / Mt Wellington, Hobart; the Quetta ranges
+  // The Hundred
+  | "rotunda"     // the Rotunda, Birmingham
+  | "mediacentre" // the pavilion at Lord's
+  | "gasholder"   // the gasholder at the Oval
+  | "tower"       // Beetham Tower, Manchester
+  | "townhall"    // Leeds Town Hall
+  | "sail"        // Southampton, a port
+  | "castle"      // Nottingham Castle
+  | "flame"       // Welsh Fire, named for it
+  | "towerbridge" // Tower Bridge, London
+  // Pakistan Super League
+  | "minaret"     // Minar-e-Pakistan, Lahore
+  | "mausoleum"   // Mazar-e-Quaid, Karachi
+  | "tentmosque"  // Faisal Mosque, Islamabad
+  | "shrine";     // the Sufi shrines of Multan
 
 /** Each franchise's city, not a guess from the colour. */
 const EMBLEMS: Record<string, Emblem> = {
@@ -47,6 +71,23 @@ const EMBLEMS: Record<string, Emblem> = {
   KTK: "fishingnet",
   RPS: "fort",
   PW: "fort",
+
+  // Big Bash. Two clubs share Sydney and two share Melbourne, so each takes a
+  // different landmark of its own city rather than repeating one.
+  SIX: "operahouse", THU: "harbourbr",
+  STA: "spire", REN: "clocktower",
+  SCO: "belltower", STR: "cathedral", HEA: "storybridge", HUR: "mountain",
+
+  // The Hundred. The 2025 rebrands keep their club's landmark, because they
+  // are the same club under a new owner, not a new one.
+  BPH: "rotunda", LNS: "mediacentre", OVI: "gasholder",
+  MNR: "tower", MSG: "tower",
+  NOS: "townhall", SUL: "townhall",
+  SOB: "sail", TRT: "castle", WEF: "flame", MIL: "towerbridge",
+
+  // Pakistan Super League.
+  LAH: "minaret", KAR: "mausoleum", ISL: "tentmosque",
+  MUL: "shrine", PES: "fort", QUE: "mountain",
 };
 
 function Emblem({ emblem, color }: { emblem: Emblem; color: string }) {
@@ -157,6 +198,194 @@ function Emblem({ emblem, color }: { emblem: Emblem; color: string }) {
           <path d="M32 22 V16" />
         </g>
       );
+    case "operahouse":
+      return (
+        <g {...s}>
+          <path d="M16 48 H48" />
+          <path d="M19 48 C19 39 23 33 29 31 L29 48" />
+          <path d="M27 48 C27 37 31 31 37 29 L37 48" />
+          <path d="M35 48 C35 35 39 29 45 27 L45 48" />
+        </g>
+      );
+    case "harbourbr":
+      return (
+        <g {...s}>
+          <path d="M16 46 H48" />
+          <path d="M21 46 V28 M43 46 V28" />
+          <path d="M18 38 Q32 21 46 38" />
+          <path d="M18 38 H46" />
+        </g>
+      );
+    case "spire":
+      return (
+        <g {...s}>
+          <path d="M20 48 H44" />
+          <path d="M26 48 L32 30 L38 48" />
+          <path d="M32 48 V17" />
+          <path d="M28 37 H36" />
+        </g>
+      );
+    case "clocktower":
+      return (
+        <g {...s}>
+          <path d="M20 48 H44" />
+          <path d="M26 48 V28 H38 V48" />
+          <path d="M26 28 Q32 21 38 28" />
+          <path d="M32 21 V17" />
+          <circle cx="32" cy="37" r="4" />
+        </g>
+      );
+    case "belltower":
+      return (
+        <g {...s}>
+          <path d="M20 48 H44" />
+          <path d="M28 48 V26 H36 V48" />
+          <path d="M32 26 V17" />
+          <path d="M22 41 L28 33 M42 41 L36 33" />
+        </g>
+      );
+    case "cathedral":
+      return (
+        <g {...s}>
+          <path d="M19 48 H45" />
+          <path d="M22 48 V33 H42 V48" />
+          <path d="M25 33 L28 20 L31 33" />
+          <path d="M33 33 L36 20 L39 33" />
+        </g>
+      );
+    case "storybridge":
+      return (
+        <g {...s}>
+          <path d="M16 45 H48" />
+          <path d="M24 45 V27 M40 45 V27" />
+          <path d="M16 36 L24 27 L40 27 L48 36" />
+          <path d="M24 36 H40" />
+        </g>
+      );
+    case "mountain":
+      return (
+        <g {...s}>
+          <path d="M16 46 H48" />
+          <path d="M18 46 L27 29 L33 37 L39 24 L48 46" />
+        </g>
+      );
+    case "rotunda":
+      return (
+        <g {...s}>
+          <path d="M20 48 H44" />
+          <path d="M26 48 V29 H38 V48" />
+          <path d="M26 29 Q32 25 38 29" />
+          <path d="M26 35 H38 M26 41 H38" />
+        </g>
+      );
+    case "mediacentre":
+      return (
+        <g {...s}>
+          <path d="M18 48 H46" />
+          <path d="M22 48 V32 H42 V48" />
+          <path d="M20 32 L32 22 L44 32" />
+          <path d="M28 48 V40 H36 V48" />
+          <circle cx="32" cy="29" r="2.5" />
+        </g>
+      );
+    case "gasholder":
+      return (
+        <g {...s}>
+          <path d="M18 48 H46" />
+          <path d="M21 48 V28 H43 V48" />
+          <path d="M27 28 V48 M32 28 V48 M37 28 V48" />
+          <path d="M21 36 H43" />
+        </g>
+      );
+    case "tower":
+      return (
+        <g {...s}>
+          <path d="M22 48 H42" />
+          <path d="M27 48 V20 H37 V48" />
+          <path d="M37 20 V14" />
+          <path d="M27 27 H37" />
+        </g>
+      );
+    case "townhall":
+      return (
+        <g {...s}>
+          <path d="M17 48 H47" />
+          <path d="M21 48 V36 H43 V48" />
+          <path d="M27 36 V22 H37 V36" />
+          <path d="M27 22 Q32 15 37 22" />
+          <path d="M32 15 V12" />
+        </g>
+      );
+    case "sail":
+      return (
+        <g {...s}>
+          <path d="M32 43 V17" />
+          <path d="M32 19 L43 40 H32" />
+          <path d="M32 25 L23 40 H32" />
+          <path d="M21 43 Q32 49 43 43" />
+        </g>
+      );
+    case "castle":
+      return (
+        <g {...s}>
+          <path d="M18 48 H46" />
+          <path d="M21 48 V30 H43 V48" />
+          <path d="M21 30 V25 H26 V30 M29 30 V25 H34 V30 M37 30 V25 H43 V30" />
+          <path d="M28 48 V39 A4 4 0 0 1 36 39 V48" />
+        </g>
+      );
+    case "flame":
+      return (
+        <g {...s}>
+          <path d="M32 50 C24 44 23 36 28 28 C29 32 31 33 32 31 C33 25 36 21 39 18 C38 25 44 29 42 38 C41 45 36 49 32 50 Z" />
+        </g>
+      );
+    case "towerbridge":
+      return (
+        <g {...s}>
+          <path d="M14 46 H50" />
+          <path d="M22 46 V26 H28 V46 M36 46 V26 H42 V46" />
+          <path d="M23 26 V21 H27 V26 M37 26 V21 H41 V26" />
+          <path d="M28 32 H36" />
+          <path d="M14 40 H22 M42 40 H50" />
+        </g>
+      );
+    case "minaret":
+      return (
+        <g {...s}>
+          <path d="M21 48 H43" />
+          <path d="M26 44 H38" />
+          <path d="M30 44 V28 L32 16 L34 28 V44" />
+        </g>
+      );
+    case "mausoleum":
+      return (
+        <g {...s}>
+          <path d="M19 48 H45" />
+          <path d="M22 48 V35 H42 V48" />
+          <path d="M24 35 Q32 20 40 35" />
+          <path d="M32 20 V16" />
+          <path d="M28 48 V41 A4 4 0 0 1 36 41 V48" />
+        </g>
+      );
+    case "tentmosque":
+      return (
+        <g {...s}>
+          <path d="M16 46 H48" />
+          <path d="M21 46 L32 28 L43 46 Z" />
+          <path d="M23 46 V23 M41 46 V23" />
+          <path d="M23 23 V19 M41 23 V19" />
+        </g>
+      );
+    case "shrine":
+      return (
+        <g {...s}>
+          <path d="M18 48 H46" />
+          <path d="M23 48 V37 H41 V48" />
+          <path d="M25 37 Q32 18 39 37" />
+          <path d="M32 18 V14" />
+        </g>
+      );
     default:
       return (
         <g {...s}>
@@ -168,6 +397,15 @@ function Emblem({ emblem, color }: { emblem: Emblem; color: string }) {
   }
 }
 
+/**
+ * The tile a flag or a supplied logo sits in. One constant, because the two
+ * appear side by side in the same column and must not read as two different
+ * kinds of thing.
+ */
+const BADGE_TILE =
+  "inline-flex shrink-0 items-center justify-center overflow-hidden " +
+  "rounded-lg border border-line bg-surface-raised";
+
 /** A franchise with no entry gets a plain shield rather than a wrong landmark. */
 function emblemFor(short: string): Emblem | null {
   return EMBLEMS[short] ?? null;
@@ -178,27 +416,84 @@ export function TeamCrest({
   size = 64,
   className,
   logoSrc,
+  flag,
+  short,
 }: {
   team: string | null | undefined;
   size?: number;
   className?: string;
   /** Operator-supplied artwork, used in place of the generated badge. */
   logoSrc?: string | null;
+  /**
+   * A national side's flag, from the API. A nation has a flag and no crest
+   * problem: it is not owned artwork and it is not a guess, which is why the
+   * country is the one case where real identity can be shown. Club crests
+   * stay generated, because they are trademarks.
+   */
+  flag?: string | null;
+  /** The API's abbreviation, when the caller has one. */
+  short?: string | null;
 }) {
-  const identity = teamIdentity(team);
+  const identity = teamIdentity(team, short);
   const id = React.useId();
   const emblem = emblemFor(identity.short);
 
-  if (logoSrc) {
+  if (flag && !logoSrc) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={logoSrc}
-        alt={`${team} crest`}
-        width={size}
-        height={size}
-        className={cn("shrink-0 object-contain", className)}
-      />
+      <span
+        role="img"
+        aria-label={`${team ?? "Team"} flag`}
+        className={cn(BADGE_TILE, className)}
+        style={{ width: size, height: size }}
+      >
+        {/* ponytail: emoji flag — zero assets, renders natively on macOS,
+            iOS and Android. Windows has no flag glyphs and falls back to the
+            two country letters, which is legible but plain. Upgrade path:
+            drop SVGs at public/flags/<CODE>.svg and prefer them here. */}
+        <span
+          aria-hidden
+          style={{
+            fontSize: Math.round(size * 0.62),
+            lineHeight: 1,
+            // The brand display face has no emoji glyphs; name the system
+            // emoji fonts so the flag is never substituted into tofu.
+            fontFamily:
+              '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif',
+          }}
+        >
+          {flag}
+        </span>
+      </span>
+    );
+  }
+
+  if (logoSrc) {
+    // The same tile the flag sits in, deliberately. A logo is one badge in a
+    // column of them, and giving it a light plate of its own made the one
+    // team that had artwork look like a sticker stuck on the card while every
+    // other side sat flat against it. Whatever the tile is, both wear it.
+    //
+    // The cost is that artwork inked for white paper - a black or navy
+    // wordmark - has little contrast here. That is a property of the file,
+    // not of the layout, and the fix is to supply the light-background
+    // variant of the mark, which every club publishes.
+    return (
+      <span
+        className={cn(BADGE_TILE, "p-1", className)}
+        // Height is fixed so a row of badges aligns, but a wide wordmark may
+        // spread to 1.6x before it is squeezed - at a square 44px a 2.77:1
+        // mark renders 13px tall and cannot be read.
+        style={{ height: size, minWidth: size, maxWidth: Math.round(size * 1.6) }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoSrc}
+          alt={`${team ?? "Team"} crest`}
+          // object-contain, never cover: a crest cropped to fill the box is a
+          // mangled trademark, which is worse than a small one.
+          className="max-h-full max-w-full object-contain"
+        />
+      </span>
     );
   }
 

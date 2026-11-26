@@ -19,6 +19,7 @@ from app import catalog
 from app.catalog import MatchContext, classify_stage
 from app.models import (
     Competition,
+    Country,
     Season,
     Team,
     TournamentGroup,
@@ -204,6 +205,40 @@ def backfill_legacy(db: Session) -> int:
     return len(rows)
 
 
+def link_countries(db: Session) -> int:
+    """Attach every national team to its country, and give it the country's code.
+
+    Cricsheet names a national side after the nation ("Sri Lanka", "Papua New
+    Guinea"), so the join is on the name, with the alternative spellings a
+    match file uses listed on the country as ``teams``. Nothing is guessed: a
+    national team whose name no country claims keeps a null country and falls
+    back to a plain badge, exactly as before.
+
+    Idempotent, and the country code becomes the team's ``short_name`` only
+    when it has none, so an explicitly configured abbreviation always wins.
+    """
+    by_name: Dict[str, Country] = {}
+    for row in db.execute(select(Country)).scalars():
+        by_name[row.name] = row
+    for entry in catalog.catalogue()["countries"]:
+        country = by_name.get(entry["name"])
+        for alias in entry.get("teams", []):
+            if country is not None:
+                by_name[alias] = country
+
+    linked = 0
+    for team in db.execute(select(Team).where(Team.is_national_team.is_(True))).scalars():
+        country = by_name.get(team.name)
+        if country is None:
+            continue
+        team.country_id = country.id
+        if not team.short_name:
+            team.short_name = country.short_code
+        linked += 1
+    db.flush()
+    return linked
+
+
 def refresh_derived(db: Session, today: Optional[dt.date] = None) -> None:
     """Recompute season dates/format/status and team/player memberships.
 
@@ -212,6 +247,7 @@ def refresh_derived(db: Session, today: Optional[dt.date] = None) -> None:
     second.
     """
     today = today or dt.date.today()
+    link_countries(db)
     db.execute(text("""
         UPDATE season SET
           start_date = (SELECT MIN(m.date) FROM match m WHERE m.season_id = season.id),

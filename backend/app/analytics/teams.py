@@ -15,6 +15,26 @@ from app.analytics.store import Dataset, Filters
 OVERSEAS_DATA_AVAILABLE = False
 
 
+def _flag(ds: Dataset, team_id: int) -> Optional[str]:
+    """The team's national flag, or None for a club side and the composite XIs.
+
+    Franchise crests are trademarks and are not reproduced, so a club side has
+    no mark here and the interface draws its own badge. A national side is a
+    nation, and a flag is neither owned artwork nor a guess.
+    """
+    countries = ds.registry.get("countries")
+    if countries is None or countries.empty:
+        return None
+    cid = ds.teams.at[team_id, "country_id"]
+    if pd.isna(cid):
+        return None
+    row = countries[countries["id"] == int(cid)]
+    if row.empty:
+        return None
+    flag = row.iloc[0]["flag"]
+    return None if pd.isna(flag) else str(flag)
+
+
 def list_teams(ds: Dataset) -> List[dict]:
     m = ds.matches
     played = pd.concat([
@@ -32,6 +52,7 @@ def list_teams(ds: Dataset) -> List[dict]:
             "id": int(tid),
             "name": ds.teams.at[tid, "name"],
             "short_name": ds.teams.at[tid, "short_name"],
+            "flag": _flag(ds, tid),
             "aliases": ds.teams.at[tid, "aliases"],
             "matches": int(r["matches"]),
             "won": won,
@@ -195,6 +216,7 @@ def profile(ds: Dataset, team_id: int, f: Filters) -> Optional[dict]:
             "id": team_id,
             "name": ds.teams.at[team_id, "name"],
             "short_name": ds.teams.at[team_id, "short_name"],
+            "flag": _flag(ds, team_id),
             "aliases": ds.teams.at[team_id, "aliases"],
         },
         "filters": f.describe(),

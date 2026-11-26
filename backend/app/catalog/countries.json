@@ -1,20 +1,680 @@
 {
- "_note": "Cricket countries referenced by the competition catalogue. 'code' is the stable key. 'flag' is an emoji where a single national flag exists; West Indies is a multi-nation team and has none.",
+ "_note": "Cricket nations and composite sides referenced by the competition catalogue and matched to national teams by name. 'code' is the stable key and the abbreviation shown in the interface. 'flag' is an emoji where a single flag exists; West Indies and the XIs are multi-nation sides and have none. 'teams' lists other spellings the match files use for the same side. 'cricket_board' is null where no board name has been verified - it is never guessed from the country name.",
  "countries": [
-  {"code": "IND", "name": "India", "flag": "🇮🇳", "cricket_board": "Board of Control for Cricket in India"},
-  {"code": "AUS", "name": "Australia", "flag": "🇦🇺", "cricket_board": "Cricket Australia"},
-  {"code": "ENG", "name": "England", "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "cricket_board": "England and Wales Cricket Board"},
-  {"code": "RSA", "name": "South Africa", "flag": "🇿🇦", "cricket_board": "Cricket South Africa"},
-  {"code": "PAK", "name": "Pakistan", "flag": "🇵🇰", "cricket_board": "Pakistan Cricket Board"},
-  {"code": "BAN", "name": "Bangladesh", "flag": "🇧🇩", "cricket_board": "Bangladesh Cricket Board"},
-  {"code": "SL", "name": "Sri Lanka", "flag": "🇱🇰", "cricket_board": "Sri Lanka Cricket"},
-  {"code": "NZ", "name": "New Zealand", "flag": "🇳🇿", "cricket_board": "New Zealand Cricket"},
-  {"code": "WI", "name": "West Indies", "flag": null, "cricket_board": "Cricket West Indies"},
-  {"code": "IRE", "name": "Ireland", "flag": "🇮🇪", "cricket_board": "Cricket Ireland"},
-  {"code": "NEP", "name": "Nepal", "flag": "🇳🇵", "cricket_board": "Cricket Association of Nepal"},
-  {"code": "USA", "name": "United States", "flag": "🇺🇸", "cricket_board": "USA Cricket"},
-  {"code": "UAE", "name": "United Arab Emirates", "flag": "🇦🇪", "cricket_board": "Emirates Cricket Board"},
-  {"code": "AFG", "name": "Afghanistan", "flag": "🇦🇫", "cricket_board": "Afghanistan Cricket Board"},
-  {"code": "ZIM", "name": "Zimbabwe", "flag": "🇿🇼", "cricket_board": "Zimbabwe Cricket"}
+  {
+   "code": "IND",
+   "name": "India",
+   "flag": "🇮🇳",
+   "cricket_board": "Board of Control for Cricket in India"
+  },
+  {
+   "code": "AUS",
+   "name": "Australia",
+   "flag": "🇦🇺",
+   "cricket_board": "Cricket Australia"
+  },
+  {
+   "code": "ENG",
+   "name": "England",
+   "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+   "cricket_board": "England and Wales Cricket Board"
+  },
+  {
+   "code": "RSA",
+   "name": "South Africa",
+   "flag": "🇿🇦",
+   "cricket_board": "Cricket South Africa"
+  },
+  {
+   "code": "PAK",
+   "name": "Pakistan",
+   "flag": "🇵🇰",
+   "cricket_board": "Pakistan Cricket Board"
+  },
+  {
+   "code": "BAN",
+   "name": "Bangladesh",
+   "flag": "🇧🇩",
+   "cricket_board": "Bangladesh Cricket Board"
+  },
+  {
+   "code": "SL",
+   "name": "Sri Lanka",
+   "flag": "🇱🇰",
+   "cricket_board": "Sri Lanka Cricket"
+  },
+  {
+   "code": "NZ",
+   "name": "New Zealand",
+   "flag": "🇳🇿",
+   "cricket_board": "New Zealand Cricket"
+  },
+  {
+   "code": "WI",
+   "name": "West Indies",
+   "flag": null,
+   "cricket_board": "Cricket West Indies"
+  },
+  {
+   "code": "IRE",
+   "name": "Ireland",
+   "flag": "🇮🇪",
+   "cricket_board": "Cricket Ireland"
+  },
+  {
+   "code": "NEP",
+   "name": "Nepal",
+   "flag": "🇳🇵",
+   "cricket_board": "Cricket Association of Nepal"
+  },
+  {
+   "code": "USA",
+   "name": "United States",
+   "flag": "🇺🇸",
+   "cricket_board": "USA Cricket",
+   "teams": [
+    "United States of America"
+   ]
+  },
+  {
+   "code": "UAE",
+   "name": "United Arab Emirates",
+   "flag": "🇦🇪",
+   "cricket_board": "Emirates Cricket Board"
+  },
+  {
+   "code": "AFG",
+   "name": "Afghanistan",
+   "flag": "🇦🇫",
+   "cricket_board": "Afghanistan Cricket Board"
+  },
+  {
+   "code": "ZIM",
+   "name": "Zimbabwe",
+   "flag": "🇿🇼",
+   "cricket_board": "Zimbabwe Cricket"
+  },
+  {
+   "code": "SCO",
+   "name": "Scotland",
+   "flag": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+   "cricket_board": "Cricket Scotland"
+  },
+  {
+   "code": "NED",
+   "name": "Netherlands",
+   "flag": "🇳🇱",
+   "cricket_board": "Royal Dutch Cricket Association"
+  },
+  {
+   "code": "NAM",
+   "name": "Namibia",
+   "flag": "🇳🇦",
+   "cricket_board": null
+  },
+  {
+   "code": "OMA",
+   "name": "Oman",
+   "flag": "🇴🇲",
+   "cricket_board": null
+  },
+  {
+   "code": "PNG",
+   "name": "Papua New Guinea",
+   "flag": "🇵🇬",
+   "cricket_board": null
+  },
+  {
+   "code": "CAN",
+   "name": "Canada",
+   "flag": "🇨🇦",
+   "cricket_board": null
+  },
+  {
+   "code": "KEN",
+   "name": "Kenya",
+   "flag": "🇰🇪",
+   "cricket_board": null
+  },
+  {
+   "code": "HK",
+   "name": "Hong Kong",
+   "flag": "🇭🇰",
+   "cricket_board": null
+  },
+  {
+   "code": "BER",
+   "name": "Bermuda",
+   "flag": "🇧🇲",
+   "cricket_board": null
+  },
+  {
+   "code": "JER",
+   "name": "Jersey",
+   "flag": "🇯🇪",
+   "cricket_board": null
+  },
+  {
+   "code": "GUE",
+   "name": "Guernsey",
+   "flag": "🇬🇬",
+   "cricket_board": null
+  },
+  {
+   "code": "IOM",
+   "name": "Isle of Man",
+   "flag": "🇮🇲",
+   "cricket_board": null
+  },
+  {
+   "code": "GIB",
+   "name": "Gibraltar",
+   "flag": "🇬🇮",
+   "cricket_board": null
+  },
+  {
+   "code": "ITA",
+   "name": "Italy",
+   "flag": "🇮🇹",
+   "cricket_board": null
+  },
+  {
+   "code": "GER",
+   "name": "Germany",
+   "flag": "🇩🇪",
+   "cricket_board": null
+  },
+  {
+   "code": "DEN",
+   "name": "Denmark",
+   "flag": "🇩🇰",
+   "cricket_board": null
+  },
+  {
+   "code": "NOR",
+   "name": "Norway",
+   "flag": "🇳🇴",
+   "cricket_board": null
+  },
+  {
+   "code": "SWE",
+   "name": "Sweden",
+   "flag": "🇸🇪",
+   "cricket_board": null
+  },
+  {
+   "code": "FIN",
+   "name": "Finland",
+   "flag": "🇫🇮",
+   "cricket_board": null
+  },
+  {
+   "code": "EST",
+   "name": "Estonia",
+   "flag": "🇪🇪",
+   "cricket_board": null
+  },
+  {
+   "code": "AUT",
+   "name": "Austria",
+   "flag": "🇦🇹",
+   "cricket_board": null
+  },
+  {
+   "code": "BEL",
+   "name": "Belgium",
+   "flag": "🇧🇪",
+   "cricket_board": null
+  },
+  {
+   "code": "FRA",
+   "name": "France",
+   "flag": "🇫🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "ESP",
+   "name": "Spain",
+   "flag": "🇪🇸",
+   "cricket_board": null
+  },
+  {
+   "code": "POR",
+   "name": "Portugal",
+   "flag": "🇵🇹",
+   "cricket_board": null
+  },
+  {
+   "code": "SUI",
+   "name": "Switzerland",
+   "flag": "🇨🇭",
+   "cricket_board": null
+  },
+  {
+   "code": "LUX",
+   "name": "Luxembourg",
+   "flag": "🇱🇺",
+   "cricket_board": null
+  },
+  {
+   "code": "CZE",
+   "name": "Czech Republic",
+   "flag": "🇨🇿",
+   "cricket_board": null
+  },
+  {
+   "code": "HUN",
+   "name": "Hungary",
+   "flag": "🇭🇺",
+   "cricket_board": null
+  },
+  {
+   "code": "ROU",
+   "name": "Romania",
+   "flag": "🇷🇴",
+   "cricket_board": null
+  },
+  {
+   "code": "BUL",
+   "name": "Bulgaria",
+   "flag": "🇧🇬",
+   "cricket_board": null
+  },
+  {
+   "code": "SRB",
+   "name": "Serbia",
+   "flag": "🇷🇸",
+   "cricket_board": null
+  },
+  {
+   "code": "CRO",
+   "name": "Croatia",
+   "flag": "🇭🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "SVN",
+   "name": "Slovenia",
+   "flag": "🇸🇮",
+   "cricket_board": null
+  },
+  {
+   "code": "GRE",
+   "name": "Greece",
+   "flag": "🇬🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "CYP",
+   "name": "Cyprus",
+   "flag": "🇨🇾",
+   "cricket_board": null
+  },
+  {
+   "code": "MLT",
+   "name": "Malta",
+   "flag": "🇲🇹",
+   "cricket_board": null
+  },
+  {
+   "code": "TUR",
+   "name": "Turkey",
+   "flag": "🇹🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "ISR",
+   "name": "Israel",
+   "flag": "🇮🇱",
+   "cricket_board": null
+  },
+  {
+   "code": "IRN",
+   "name": "Iran",
+   "flag": "🇮🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "SAU",
+   "name": "Saudi Arabia",
+   "flag": "🇸🇦",
+   "cricket_board": null
+  },
+  {
+   "code": "QAT",
+   "name": "Qatar",
+   "flag": "🇶🇦",
+   "cricket_board": null
+  },
+  {
+   "code": "KUW",
+   "name": "Kuwait",
+   "flag": "🇰🇼",
+   "cricket_board": null
+  },
+  {
+   "code": "BHR",
+   "name": "Bahrain",
+   "flag": "🇧🇭",
+   "cricket_board": null
+  },
+  {
+   "code": "MDV",
+   "name": "Maldives",
+   "flag": "🇲🇻",
+   "cricket_board": null
+  },
+  {
+   "code": "BHU",
+   "name": "Bhutan",
+   "flag": "🇧🇹",
+   "cricket_board": null
+  },
+  {
+   "code": "MYS",
+   "name": "Malaysia",
+   "flag": "🇲🇾",
+   "cricket_board": null
+  },
+  {
+   "code": "SGP",
+   "name": "Singapore",
+   "flag": "🇸🇬",
+   "cricket_board": null
+  },
+  {
+   "code": "THA",
+   "name": "Thailand",
+   "flag": "🇹🇭",
+   "cricket_board": null
+  },
+  {
+   "code": "IDN",
+   "name": "Indonesia",
+   "flag": "🇮🇩",
+   "cricket_board": null
+  },
+  {
+   "code": "PHI",
+   "name": "Philippines",
+   "flag": "🇵🇭",
+   "cricket_board": null
+  },
+  {
+   "code": "CHN",
+   "name": "China",
+   "flag": "🇨🇳",
+   "cricket_board": null
+  },
+  {
+   "code": "JPN",
+   "name": "Japan",
+   "flag": "🇯🇵",
+   "cricket_board": null
+  },
+  {
+   "code": "KOR",
+   "name": "South Korea",
+   "flag": "🇰🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "MNG",
+   "name": "Mongolia",
+   "flag": "🇲🇳",
+   "cricket_board": null
+  },
+  {
+   "code": "MMR",
+   "name": "Myanmar",
+   "flag": "🇲🇲",
+   "cricket_board": null
+  },
+  {
+   "code": "KHM",
+   "name": "Cambodia",
+   "flag": "🇰🇭",
+   "cricket_board": null
+  },
+  {
+   "code": "TLS",
+   "name": "Timor-Leste",
+   "flag": "🇹🇱",
+   "cricket_board": null
+  },
+  {
+   "code": "UZB",
+   "name": "Uzbekistan",
+   "flag": "🇺🇿",
+   "cricket_board": null
+  },
+  {
+   "code": "FIJ",
+   "name": "Fiji",
+   "flag": "🇫🇯",
+   "cricket_board": null
+  },
+  {
+   "code": "SAM",
+   "name": "Samoa",
+   "flag": "🇼🇸",
+   "cricket_board": null
+  },
+  {
+   "code": "VAN",
+   "name": "Vanuatu",
+   "flag": "🇻🇺",
+   "cricket_board": null
+  },
+  {
+   "code": "COK",
+   "name": "Cook Islands",
+   "flag": "🇨🇰",
+   "cricket_board": null
+  },
+  {
+   "code": "NGA",
+   "name": "Nigeria",
+   "flag": "🇳🇬",
+   "cricket_board": null
+  },
+  {
+   "code": "GHA",
+   "name": "Ghana",
+   "flag": "🇬🇭",
+   "cricket_board": null
+  },
+  {
+   "code": "UGA",
+   "name": "Uganda",
+   "flag": "🇺🇬",
+   "cricket_board": null
+  },
+  {
+   "code": "TAN",
+   "name": "Tanzania",
+   "flag": "🇹🇿",
+   "cricket_board": null
+  },
+  {
+   "code": "RWA",
+   "name": "Rwanda",
+   "flag": "🇷🇼",
+   "cricket_board": null
+  },
+  {
+   "code": "BOT",
+   "name": "Botswana",
+   "flag": "🇧🇼",
+   "cricket_board": null
+  },
+  {
+   "code": "MWI",
+   "name": "Malawi",
+   "flag": "🇲🇼",
+   "cricket_board": null
+  },
+  {
+   "code": "ZAM",
+   "name": "Zambia",
+   "flag": "🇿🇲",
+   "cricket_board": null
+  },
+  {
+   "code": "MOZ",
+   "name": "Mozambique",
+   "flag": "🇲🇿",
+   "cricket_board": null
+  },
+  {
+   "code": "LES",
+   "name": "Lesotho",
+   "flag": "🇱🇸",
+   "cricket_board": null
+  },
+  {
+   "code": "SWZ",
+   "name": "Eswatini",
+   "flag": "🇸🇿",
+   "cricket_board": null,
+   "teams": [
+    "Swaziland"
+   ]
+  },
+  {
+   "code": "CMR",
+   "name": "Cameroon",
+   "flag": "🇨🇲",
+   "cricket_board": null
+  },
+  {
+   "code": "CIV",
+   "name": "Ivory Coast",
+   "flag": "🇨🇮",
+   "cricket_board": null
+  },
+  {
+   "code": "MLI",
+   "name": "Mali",
+   "flag": "🇲🇱",
+   "cricket_board": null
+  },
+  {
+   "code": "GAM",
+   "name": "Gambia",
+   "flag": "🇬🇲",
+   "cricket_board": null
+  },
+  {
+   "code": "SLE",
+   "name": "Sierra Leone",
+   "flag": "🇸🇱",
+   "cricket_board": null
+  },
+  {
+   "code": "SEY",
+   "name": "Seychelles",
+   "flag": "🇸🇨",
+   "cricket_board": null
+  },
+  {
+   "code": "STH",
+   "name": "St Helena",
+   "flag": "🇸🇭",
+   "cricket_board": null
+  },
+  {
+   "code": "ARG",
+   "name": "Argentina",
+   "flag": "🇦🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "BRA",
+   "name": "Brazil",
+   "flag": "🇧🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "CHI",
+   "name": "Chile",
+   "flag": "🇨🇱",
+   "cricket_board": null
+  },
+  {
+   "code": "PER",
+   "name": "Peru",
+   "flag": "🇵🇪",
+   "cricket_board": null
+  },
+  {
+   "code": "MEX",
+   "name": "Mexico",
+   "flag": "🇲🇽",
+   "cricket_board": null
+  },
+  {
+   "code": "PAN",
+   "name": "Panama",
+   "flag": "🇵🇦",
+   "cricket_board": null
+  },
+  {
+   "code": "CRC",
+   "name": "Costa Rica",
+   "flag": "🇨🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "BLZ",
+   "name": "Belize",
+   "flag": "🇧🇿",
+   "cricket_board": null
+  },
+  {
+   "code": "SUR",
+   "name": "Suriname",
+   "flag": "🇸🇷",
+   "cricket_board": null
+  },
+  {
+   "code": "BAH",
+   "name": "Bahamas",
+   "flag": "🇧🇸",
+   "cricket_board": null
+  },
+  {
+   "code": "CAY",
+   "name": "Cayman Islands",
+   "flag": "🇰🇾",
+   "cricket_board": null
+  },
+  {
+   "code": "TCA",
+   "name": "Turks and Caicos Islands",
+   "flag": "🇹🇨",
+   "cricket_board": null,
+   "teams": [
+    "Turks and Caicos Island"
+   ]
+  },
+  {
+   "code": "WLDXI",
+   "name": "ICC World XI",
+   "flag": null,
+   "cricket_board": null
+  },
+  {
+   "code": "AFRXI",
+   "name": "Africa XI",
+   "flag": null,
+   "cricket_board": null
+  },
+  {
+   "code": "ASIAXI",
+   "name": "Asia XI",
+   "flag": null,
+   "cricket_board": null
+  }
  ]
 }

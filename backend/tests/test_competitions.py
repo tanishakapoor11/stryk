@@ -320,10 +320,10 @@ def db_engine(tmp_path, monkeypatch):
     """A fresh database built by the real migrations, wired into the app."""
     from app.analytics import store
     from app.core import db as core_db
-    from app.core.migrate import upgrade
+    from app.core.migrate import head, upgrade
 
     eng = create_engine(f"sqlite:///{tmp_path / 'stryk.db'}", future=True)
-    assert upgrade(eng) == "0002"
+    assert upgrade(eng) == head()
     monkeypatch.setattr(core_db, "engine", eng)
     monkeypatch.setattr(store, "engine", eng)
     store._cache = None
@@ -648,7 +648,7 @@ def test_rain_revised_target_uses_par_for_side_batting_first():
 # ---------------------------------------------------------------- migrations
 def test_legacy_database_is_upgraded_in_place(tmp_path, monkeypatch):
     """A database built by the old create_all path keeps its rows and gets linked."""
-    from app.core.migrate import downgrade, upgrade
+    from app.core.migrate import downgrade, head, upgrade
 
     eng = create_engine(f"sqlite:///{tmp_path / 'legacy.db'}", future=True)
     assert upgrade(eng, "0001") == "0001"
@@ -666,7 +666,7 @@ def test_legacy_database_is_upgraded_in_place(tmp_path, monkeypatch):
         c.execute(text("INSERT INTO innings (id, match_id, innings_number, batting_team_id, "
                        "bowling_team_id, is_super_over, is_chase) VALUES (1, 'L1', 1, 1, 2, 0, 0)"))
 
-    assert upgrade(eng) == "0002"
+    assert upgrade(eng) == head()
     with eng.connect() as c:
         assert c.execute(text("SELECT COUNT(*) FROM innings")).scalar() == 1  # not cascaded away
         linked = c.execute(text(
@@ -724,3 +724,48 @@ def test_global_summary_counts_without_pooling(mixed_db):
     assert s["latest_results"][0]["competition"]["slug"] == "mens-t20is"
     # Suggestions are leaders within one competition each, never a combined total.
     assert len({p["competition"] for p in s["suggestions"]}) == len(s["suggestions"])
+
+
+def test_national_teams_are_linked_to_a_country_and_clubs_are_not(tmp_path):
+    """A nation gets its country, flag and code; anything else is left alone.
+
+    The interface draws a flag only when the API sends one, so the thing that
+    must hold is that a flag never appears for a side that has no nation —
+    a club, or a composite XI like the ICC World XI, which is a real team and
+    deliberately carries a null flag.
+    """
+    from sqlalchemy import create_engine
+
+    from app import catalog
+    from app.core.migrate import upgrade
+    from app.ingestion.linking import link_countries
+
+    eng = create_engine(f"sqlite:///{tmp_path / 'c.db'}", future=True)
+    upgrade(eng)
+    with Session(eng) as db:
+        catalog.seed(db)
+        db.execute(text(
+            "INSERT INTO team (name, gender, aliases, is_national_team, team_type) VALUES "
+            "('India', 'MEN', '[]', 1, 'NATIONAL'),"
+            "('United States of America', 'MEN', '[]', 1, 'NATIONAL'),"
+            "('ICC World XI', 'MEN', '[]', 1, 'NATIONAL'),"
+            "('Atlantis', 'MEN', '[]', 1, 'NATIONAL'),"
+            "('Surrey', 'MEN', '[]', 0, 'DOMESTIC')"))
+        assert link_countries(db) == 3   # Atlantis is no country; Surrey is no nation
+        db.commit()
+
+        got = dict(db.execute(text(
+            "SELECT t.name, c.flag FROM team t LEFT JOIN country c ON c.id = t.country_id")).all())
+        assert got["India"] == "\U0001F1EE\U0001F1F3"
+        # The match files spell it out; the catalogue matches it by alias.
+        assert got["United States of America"] == "\U0001F1FA\U0001F1F8"
+        assert got["ICC World XI"] is None      # a real side, no single nation
+        assert got["Atlantis"] is None          # unknown: linked to nothing, invented nothing
+        assert got["Surrey"] is None            # a club has no flag here
+
+        codes = dict(db.execute(text("SELECT name, short_name FROM team")).all())
+        assert codes["India"] == "IND" and codes["ICC World XI"] == "WLDXI"
+        assert codes["Atlantis"] is None and codes["Surrey"] is None
+
+        # Idempotent: a second pass changes nothing.
+        assert link_countries(db) == 3

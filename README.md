@@ -266,6 +266,20 @@ footer can use them directly.
 | `app/icon.png`, `app/apple-icon.png` | Favicon and touch icon (Next picks these up by filename) |
 | `app/opengraph-image.png` | Social share card |
 
+**Franchise colours** are treated as data a reader already has: a fan reads Sydney Sixers
+from the magenta before reading the word, so `frontend/lib/teams.ts` carries the palette
+for the strongly branded T20 franchises — IPL, BBL and WBBL, The Hundred, PSL, the current
+CPL sides, SA20, the ILT20 and MLC clubs that inherit a parent franchise's identity, and
+the WPL. That is what stops a league page being a wall of identical grey while its logos
+are still missing.
+
+Three groups are left neutral deliberately, and the module says so: first-class and List A
+sides, which have club colours in the heraldic sense but no recognised brand palette;
+leagues whose franchises churn every season or two (the BPL's 34 teams across its history,
+the LPL's 19); and individual clubs whose colours could not be established. A guessed
+colour is worse than a neutral one, because it looks like knowledge. Anything unlisted
+falls back to slate plus a derived abbreviation.
+
 The palette in `tailwind.config.ts` is taken from the mark: its navy is the canvas and
 its orange (`#FC5200`) is the accent, so the product and the logo are the same object.
 The accent carries brand and interaction only — green and red still mean better or worse
@@ -296,13 +310,98 @@ depends on a photo existing.
 Photos land in `frontend/public/players/` and are gitignored — they are fetched assets,
 like the Cricsheet data itself.
 
-**Franchise badges** are original shield marks. Each carries a simplified landmark from
-the team's own city — the Charminar for Hyderabad, Howrah Bridge for Kolkata, a gopuram
-for Chennai, a kite for Gujarat — which ties the badge to the franchise and gives a fan
-something they recognise, without imitating anybody's artwork. If you hold the rights to
-the real crests, drop files at `frontend/public/teams/<SHORT>.svg` (or `.png`, `.webp` —
-e.g. `CSK.svg`) and they are used instead automatically. See
-`components/ui/team-crest.tsx` and `teamLogo()` in `lib/photos.ts`.
+**Team artwork** resolves in three steps, and the first that exists wins:
+
+1. **A file the operator supplied**, at `frontend/public/teams/<team-name-slug>.svg`
+   (`.png`, `.webp`, `.jpg` also read; a vector wins over a bitmap of the same name).
+   This is the only route by which a real crest or board mark appears.
+2. **The national flag**, for a national side (see below).
+3. **A generated shield**, in the franchise's colours, carrying a simplified landmark from
+   its own city. The Charminar for Hyderabad, Howrah Bridge for Kolkata, a gopuram for
+   Chennai and a kite for Gujarat in the IPL; the Opera House and Harbour Bridge splitting
+   Sydney, the Arts Centre spire and Flinders Street clock splitting Melbourne, a bell
+   tower for Perth and kunanyi for Hobart in the Big Bash; the Rotunda, the Oval
+   gasholder, Lord's pavilion and Tower Bridge in the Hundred; Minar-e-Pakistan,
+   Mazar-e-Quaid and the Faisal Mosque in the PSL. All original artwork, so it imitates
+   nobody while still giving a fan something they recognise. Thirty-two emblems in
+   `components/ui/team-crest.tsx`; a club with no entry gets a plain shield in its colours
+   rather than a wrong landmark.
+
+   Each one was rendered and looked at rather than trusted from its path data, which is
+   how a stadium bowl with two floodlights turned out to read unmistakably as a face, a
+   banded tower as a ladder, and two spired piers as a pair of pencils. All three were
+   redrawn.
+
+**Most marks must be supplied by an operator.** A club crest is normally non-free, so
+Commons will not host it: it sits on Wikipedia under a fair-use tag that does not permit
+reuse. The exception is the subset simple enough to fall below the threshold of
+originality — plain wordmarks and basic shapes — which are public domain and genuinely
+free to copy.
+
+`python scripts/fetch_team_logos.py` takes exactly that subset and nothing else:
+
+```bash
+python scripts/fetch_team_logos.py --dry-run               # report, download nothing
+python scripts/fetch_team_logos.py --competition ipl
+```
+
+**What it will and will not find.** It saves **public-domain files only**, and the only
+cricket marks in the public domain are the ones simple enough to carry no copyright —
+plain lettering. A franchise's real emblem (the CSK lion, the RCB crest, the SRH sun) is an
+original artistic work, fully copyrighted, and exists nowhere under a free licence; every
+one of them comes back empty. Plain wordmarks that *are* free tend to look wrong beside
+those emblems, so artwork supplied by hand is the normal path for a franchise, and this
+script is the exception rather than the rule. A CC-BY or CC-BY-SA logo carries an attribution
+obligation that no part of the interface currently discharges, so those are listed at the
+end for a decision rather than downloaded. Licence and source for everything it keeps are
+recorded in `frontend/public/teams/credits.json`.
+
+Matching is deliberately strict, because Commons' relevance search is actively misleading
+here: searching it for "Sydney Sixers" returns a photograph of the Sydney to Hobart yacht
+race, and "Kolkata Knight Riders" a picture of Sourav Ganguly. A candidate is accepted
+only when its own file name contains every significant word of the team's name *and* a
+word like "logo" or "crest", and names belonging to another sport are rejected outright —
+the West Indies *Football* Association badge passes every other test. A wrong logo is
+worse than no logo, because nothing about it looks like an error.
+
+`python scripts/team_logo_manifest.py` prints the exact filename to use for every team, so
+supplying artwork is mechanical rather than guesswork:
+
+```bash
+python scripts/team_logo_manifest.py --competition ipl     # one league
+python scripts/team_logo_manifest.py --missing             # only what is still absent
+python scripts/team_logo_manifest.py --csv > teams.csv     # hand to a designer
+```
+
+Files are keyed on the **slugged team name** (`sydney-sixers.svg`, `india.svg`), not the
+abbreviation. Across 151 competitions the short forms collide — Kent and Kenya are both
+KEN, Northamptonshire and Norway both NOR — so a short name is not a safe key. The
+abbreviation is still tried second, for artwork added before this. Men's and women's sides
+of the same nation share one file. See `components/ui/team-crest.tsx` and `teamLogo()` in
+`lib/photos.ts`.
+
+**National sides are identified by their flag, not by a board logo.** The flag is what
+cricket actually uses — ESPNcricinfo, Cricbuzz and Crex all label a country that way — and
+a board's corporate mark sitting next to a flag in the same column makes that column read
+as two different things. `fetch_team_logos.py` therefore skips any national side that has
+a flag, and looks one up only for a side that has none: West Indies, and the composite XIs.
+A flag is also neither owned artwork nor a guess. Every national side is linked to a
+country in `backend/app/catalog/countries.json` by the name the match files use, with
+alternative spellings listed on the country (`United States of America` → `USA`), and the
+API sends the flag on each team. The flag is an emoji, so it costs nothing to serve and
+cannot fail to load; Windows ships no flag glyphs and falls back to the two country
+letters. To replace it with artwork, drop SVGs at `frontend/public/flags/` and prefer them
+in `TeamCrest`.
+
+A side with no single nation has a null flag: West Indies, and the composite XIs (ICC
+World XI, Africa XI, Asia XI). Nothing is invented for them — West Indies carries the
+real cricket crest, which is public domain, and the XIs fall back to the generated badge.
+
+**Abbreviations.** The database carries a short name for the IPL franchises and, through
+the country link, for every nation. The ~300 remaining domestic and franchise sides have
+none, so `initials()` in `frontend/lib/teams.ts` derives one for display (Surrey → SUR,
+Trinbago Knight Riders → TKR). It is a display label, not a claimed fact — before this
+they rendered as an em dash, which read as missing data.
 
 ---
 

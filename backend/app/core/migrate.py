@@ -32,6 +32,14 @@ def _config(connection) -> Config:
     return cfg
 
 
+def head() -> str:
+    """The latest revision on disk. Tests assert against this rather than a
+    literal, so adding a migration does not break them."""
+    from alembic.script import ScriptDirectory
+
+    return ScriptDirectory.from_config(_config(None)).get_current_head()
+
+
 def upgrade(engine: Optional[Engine] = None, revision: str = "head") -> str:
     """Upgrade to ``revision``; returns the revision the database ended at."""
     engine = engine or default_engine
