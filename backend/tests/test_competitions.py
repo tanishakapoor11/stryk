@@ -37,6 +37,42 @@ def test_catalogue_is_valid_and_complete():
         assert c["match"] or c.get("unavailable_reason"), c["slug"]
 
 
+def test_every_country_flag_decodes_to_an_iso_region():
+    """The flag is load-bearing, not decoration.
+
+    Cricket codes (IND, RSA, ENG) are not ISO, and the frontend orders the
+    competition directory by matching a reader's ISO country against each
+    competition's flag — decoding the regional indicator letters rather than
+    keeping a second 111-row mapping that could drift from this one. A flag
+    built by hand out of the wrong code points would break that silently, so
+    the same decode runs here.
+    """
+    def region(flag: str) -> str | None:
+        points = [ord(c) for c in flag]
+        letters = "".join(chr(c - 0x1F1E6 + 65) for c in points if 0x1F1E6 <= c <= 0x1F1FF)
+        if len(letters) == 2:
+            return letters
+        # England, Scotland and Wales: a black flag plus tags spelling "gbeng".
+        tags = "".join(chr(c - 0xE0000) for c in points if 0xE0061 <= c <= 0xE007A)
+        return tags[:2].upper() if len(tags) >= 2 else None
+
+    countries = catalog.catalogue()["countries"]
+    flagged = [c for c in countries if c["flag"]]
+    # The multi-nation sides (West Indies, the World XIs) have no flag to fly.
+    assert len(flagged) >= 100, "the catalogue lost its flags"
+    for c in flagged:
+        assert region(c["flag"]) is not None, f"{c['code']} has an undecodable flag"
+    # Spot-check the two shapes, including the subdivision sequence that makes
+    # a reader in the UK meet county cricket first.
+    by_code = {c["code"]: c for c in countries}
+    assert region(by_code["IND"]["flag"]) == "IN"
+    assert region(by_code["RSA"]["flag"]) == "ZA"
+    assert region(by_code["ENG"]["flag"]) == "GB"
+    # Two competitions must never collide on one region by accident.
+    regions = [region(c["flag"]) for c in flagged]
+    assert regions.count("IN") == 1
+
+
 def test_every_catalogued_competition_is_ranked_for_display():
     """Lists are ordered by prominence, so an unranked competition would sort
     behind the auto-created one-match tours - which is right for those, and

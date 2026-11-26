@@ -6,9 +6,18 @@ import { CompetitionCard } from "@/components/competitions/competition-card";
 import { DirectoryFilters } from "@/components/competitions/directory-filters";
 import { DIRECTORY_PRESETS, TYPE_LABEL, type DirectoryPreset } from "@/lib/competitions";
 import { many, one, type RawParams } from "@/lib/search-params";
+import { flagRegion, visitorCountry } from "@/lib/geo";
 import type { CompetitionCard as Card, CompetitionDirectory, CompetitionType } from "@/types";
 
 type CountryRow = { code: string; name: string; competitions: number };
+
+/** Keeps both halves in the order the API sorted them. */
+function partition<T>(items: T[], pick: (item: T) => boolean): [T[], T[]] {
+  const yes: T[] = [];
+  const no: T[] = [];
+  for (const item of items) (pick(item) ? yes : no).push(item);
+  return [yes, no];
+}
 
 const SECTION_ORDER: CompetitionType[] = [
   "INTERNATIONAL",
@@ -61,12 +70,36 @@ export async function CompetitionDirectoryPage({
   }
 
   const withData = directory.items.filter((c) => c.coverage.matches > 0).length;
-  // The full directory groups by type; a preset page is already one type.
-  const groups: [string, Card[]][] =
-    preset === "all" || preset === "women"
-      ? SECTION_ORDER.map((t) => [TYPE_LABEL[t], directory.items.filter((c) => c.type === t)] as [string, Card[]]).filter(
-          ([, items]) => items.length,
-        )
+
+  // Someone opening Domestic almost always wants their own country's cricket,
+  // and ours is a directory of 21 of them in which Ranji can sit below the
+  // Bob Willis Trophy. So the reader's own country is lifted to the front —
+  // lifted, not filtered: everything else keeps its place directly below.
+  // A country already chosen in the filters is honoured as-is; an explicit
+  // choice outranks a guess about where someone is sitting.
+  // The full directory groups by type, which is the point of those pages, so
+  // only the single-type presets reorder by country.
+  const byType = preset === "all" || preset === "women";
+  const home = byType || query.country ? null : visitorCountry();
+  // `home` must be checked explicitly: a competition with no country decodes
+  // to null too, so a bare equality would quietly gather every international
+  // and ICC event into "yours" the moment there is no country to compare.
+  const [mine, elsewhere] = home
+    ? partition(directory.items, (c) => flagRegion(c.country?.flag) === home)
+    : [[] as Card[], directory.items];
+  // Nothing of the reader's own, or nothing but it, means there is no order
+  // to change — and so nothing to announce.
+  const lifted = mine.length > 0 && elsewhere.length > 0;
+  const homeLabel = Array.from(new Set(mine.map((c) => c.country?.name)))
+    .filter(Boolean)
+    .join(" and ");
+
+  const groups: [string, Card[]][] = byType
+    ? SECTION_ORDER.map((t) => [TYPE_LABEL[t], directory.items.filter((c) => c.type === t)] as [string, Card[]]).filter(
+        ([, items]) => items.length,
+      )
+    : lifted
+      ? [[homeLabel, mine], ["Elsewhere", elsewhere]]
       : [["", directory.items]];
 
   return (
@@ -88,6 +121,9 @@ export async function CompetitionDirectoryPage({
             {directory.total} {directory.total === 1 ? "competition" : "competitions"}, {withData} with
             data in STRYK. Every card says how much of it we actually hold, so a missing record is
             never mistaken for a zero.
+            {lifted ? (
+              <> {homeLabel} is listed first because that is where you appear to be reading from.</>
+            ) : null}
           </p>
           <div className="mt-5">
             <DirectoryFilters
