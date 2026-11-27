@@ -715,29 +715,58 @@ def global_summary(base: Dataset, recent: int = 10) -> dict:
     }
 
 
-def _suggestions(base: Dataset, cards: List[dict], count: int = 6) -> List[dict]:
-    """Top run-scorer of each of the most prominent competitions, women's and men's alternating.
+#: Names to start a search from, in scorecard form as the data stores them.
+#:
+#: Deliberately a hand-written list rather than a computed one. The old version
+#: took each competition's leading run-scorer, which is a statistic, not an
+#: answer to "who will someone type first" - it surfaced the top scorer of a
+#: qualifying tournament ahead of players an order of magnitude better known.
+#: There is no search log to rank by, so the honest thing is to admit this is
+#: an editorial choice and keep it in one obvious place.
+#:
+#: Weighted towards the audience STRYK is built for, and holding two women's
+#: players because the rest of the page treats both games as one record.
+#: Reorder freely; a name that no longer resolves is skipped, not fatal.
+SUGGESTED_PLAYERS = (
+    "Virat Kohli",
+    "Rohit Sharma",
+    "MS Dhoni",
+    "Smriti Mandhana",
+    "Jasprit Bumrah",
+    "Harmanpreet Kaur",
+)
 
-    Names to start a search from; each is the leader *within* one competition,
-    so no record is combined across competitions.
+
+def _suggestions(base: Dataset, cards: List[dict], count: int = 6) -> List[dict]:
+    """Well-known players to start a search from.
+
+    Resolves :data:`SUGGESTED_PLAYERS` against both the scorecard name and the
+    display name, because a famous player is usually filed under neither
+    spelling you would guess: Rohit Sharma is "RG Sharma" on the scorecard,
+    while two far less-played cricketers are literally named "Rohit Sharma".
+
+    A name can therefore match several players, and the one meant is the one
+    who has played most. Appearances rank them rather than runs, so that a
+    bowler is not beaten by a namesake who merely batted more.
     """
-    totals = store.ball_totals()
-    if totals.empty:
+    players = base.players
+    if players.empty:
         return []
-    runs = totals.set_index(["competition_id", "batter_id"])["runs"]
-    ranked = sorted(cards, key=lambda c: (rank(c), -c["coverage"]["matches"]))
-    queues = [[c for c in ranked if c["gender"] == g] for g in ("MEN", "WOMEN")]
-    ordered = [c for pair in zip(*queues) for c in pair] + queues[0][len(queues[1]):] + queues[1][len(queues[0]):]
-    out, seen = [], set()
-    for c in ordered:
-        if c["id"] not in runs.index.get_level_values(0):
+    squads = base.squads
+    caps = (squads.groupby("player_id").size()
+            if squads is not None and not squads.empty else None)
+
+    out: List[dict] = []
+    for wanted in SUGGESTED_PLAYERS:
+        hits = players.index[
+            (players["name"] == wanted) | (players["display_name"] == wanted)
+        ].tolist()
+        if not hits:
             continue
-        pid = runs.loc[c["id"]].idxmax()
-        if pid in seen:
-            continue
-        seen.add(pid)
-        out.append({"id": pid, "name": base.player_name(pid) or pid,
-                    "competition": c["short_name"] or c["name"]})
+        if len(hits) > 1 and caps is not None:
+            hits.sort(key=lambda pid: -int(caps.get(pid, 0)))
+        pid = hits[0]
+        out.append({"id": pid, "name": base.player_name(pid) or pid, "competition": None})
         if len(out) >= count:
             break
     return out

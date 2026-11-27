@@ -837,3 +837,35 @@ def test_national_teams_are_linked_to_a_country_and_clubs_are_not(tmp_path):
 
         # Idempotent: a second pass changes nothing.
         assert link_countries(db) == 3
+
+
+def test_a_suggested_name_resolves_to_the_player_who_actually_played_it():
+    """The namesake trap: the famous player is rarely the literal match.
+
+    "Rohit Sharma" is stored as "RG Sharma" on scorecards, while two players
+    of almost no appearances are literally named "Rohit Sharma". Matching the
+    name alone picks one of those two, so the home page would offer a search
+    suggestion for a cricketer with a handful of matches. Resolution has to
+    consider the display name as well, and rank what it finds by appearances.
+    """
+    import types
+    import pandas as pd
+    from app.analytics.competitions import _suggestions
+
+    players = pd.DataFrame(
+        {"name": ["RG Sharma", "Rohit Sharma", "JJ Bumrah"],
+         "display_name": ["Rohit Sharma", "Rohit Sharma", "Jasprit Bumrah"]},
+        index=["famous", "namesake", "bowler"],
+    )
+    # The namesake batted more than the bowler ever has; appearances, not runs,
+    # must decide, or a bowler loses his own name to whoever batted longer.
+    squads = pd.DataFrame({"player_id": ["famous"] * 700 + ["namesake"] * 3 + ["bowler"] * 400})
+    base = types.SimpleNamespace(
+        players=players, squads=squads,
+        player_name=lambda pid: players.loc[pid, "display_name"],
+    )
+
+    out = _suggestions(base, [], count=6)
+    picked = {row["name"]: row["id"] for row in out}
+    assert picked["Rohit Sharma"] == "famous"
+    assert picked["Jasprit Bumrah"] == "bowler"
