@@ -223,10 +223,32 @@ def by_over(faced: pd.DataFrame, bowled: pd.DataFrame) -> List[dict]:
     return rows
 
 
+#: Sort key -> the column it orders by. Every column is already computed by
+#: metrics.batting_summary / bowling_summary; this map only decides what a
+#: caller may sort on. app.analytics.ask advertises these keys verbatim.
+SORT_COLUMNS = {
+    "runs": "runs", "average": "batting_average", "strike_rate": "strike_rate",
+    "wickets": "wickets", "economy": "economy", "matches": "matches",
+    "name": "name", "bowling_average": "bowling_average",
+    "sixes": "sixes", "balls": "balls",
+    "highest_score": "highest_score", "fifties": "fifties",
+    "hundreds": "hundreds", "boundary_pct": "boundary_pct",
+    "innings": "innings", "overs": "balls_bowled",
+}
+
+
 def directory(ds: Dataset, f: Filters, search: Optional[str] = None,
               role: Optional[str] = None, sort: str = "runs",
-              order: str = "desc", limit: int = 50, offset: int = 0) -> dict:
-    """Searchable, sortable player index with batting and bowling totals."""
+              order: str = "desc", limit: int = 50, offset: int = 0,
+              min_balls: int = 0, min_innings: int = 0, min_runs: int = 0,
+              min_wickets: int = 0) -> dict:
+    """Searchable, sortable player index with batting and bowling totals.
+
+    The ``min_*`` floors exist because a rate sorted without one is noise: the
+    best strike rate in any competition belongs to whoever faced two balls and
+    hit a six. They are applied to the batting sample, except ``min_wickets``,
+    which filters the bowling side.
+    """
     bat_dv = store.apply(ds.deliveries, f, team_column="batting_team_id")
     bowl_dv = store.apply(ds.deliveries, f, team_column="bowling_team_id")
     bat = metrics.batting_summary(bat_dv).set_index("player_id")
@@ -271,12 +293,13 @@ def directory(ds: Dataset, f: Filters, search: Optional[str] = None,
         df = df[df.index.isin(hits or [])]
     if role:
         df = df[df["role"] == role]
+    for column, floor in (("balls", min_balls), ("innings", min_innings),
+                          ("runs", min_runs), ("wickets", min_wickets)):
+        if floor:
+            df = df[df[column].fillna(0) >= floor]
 
     total = len(df)
-    sort_col = {"runs": "runs", "average": "batting_average", "strike_rate": "strike_rate",
-                "wickets": "wickets", "economy": "economy", "matches": "matches",
-                "name": "name", "bowling_average": "bowling_average",
-                "sixes": "sixes", "balls": "balls"}.get(sort, "runs")
+    sort_col = SORT_COLUMNS.get(sort, "runs")
     if sort_col not in df.columns:
         sort_col = "runs"
     ascending = order == "asc"
@@ -288,6 +311,9 @@ def directory(ds: Dataset, f: Filters, search: Optional[str] = None,
         "offset": offset,
         "sort": sort,
         "order": order,
+        "minimums": {k: v for k, v in {
+            "balls": min_balls, "innings": min_innings,
+            "runs": min_runs, "wickets": min_wickets}.items() if v},
         "filters": f.describe(),
         "rows": metrics.records(page, ds),
     }

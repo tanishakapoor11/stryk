@@ -653,3 +653,100 @@ def test_search_never_invents_a_name_for_an_unresolved_player():
     hit = names.search(ds, "Gayle")[0]
     assert hit["name"] == "CH Gayle"
     assert hit["scorecard_name"] == "CH Gayle"
+
+
+# ------------------------------------------------------- over-range filtering
+def _over_frame():
+    """One delivery in each of overs 0-19, Cricsheet's 0-based numbering."""
+    return pd.DataFrame({
+        "over": list(range(20)),
+        "phase": [phase_for_over(o, "T20") for o in range(20)],
+        "is_super_over": [False] * 20,
+    })
+
+
+def test_over_range_is_inclusive_and_one_based():
+    """``over_from``/``over_to`` count overs the way a person does.
+
+    "Overs 1 to 6" means the first six of the innings, which Cricsheet stores
+    as 0-5. The filter must shift by one; an off-by-one here would silently
+    report the wrong six overs rather than fail loudly.
+    """
+    df = _over_frame()
+    picked = store.apply(df, store.Filters(over_from=1, over_to=6))
+    assert list(picked["over"]) == [0, 1, 2, 3, 4, 5]
+
+    # A single over, both bounds equal: the 20th over is stored as 19.
+    last = store.apply(df, store.Filters(over_from=20, over_to=20))
+    assert list(last["over"]) == [19]
+
+    # Open-ended ranges.
+    assert list(store.apply(df, store.Filters(over_from=17))["over"]) == [16, 17, 18, 19]
+    assert list(store.apply(df, store.Filters(over_to=2))["over"]) == [0, 1]
+
+
+def test_over_range_agrees_with_the_phase_labels():
+    """The T20 powerplay is overs 1-6, so the two filters must select the same
+    deliveries. This pins the over filter to constants.PHASE_DEFINITIONS
+    rather than letting the two drift apart."""
+    df = _over_frame()
+    by_over = store.apply(df, store.Filters(over_from=1, over_to=6))
+    by_phase = store.apply(df, store.Filters(phases=["powerplay"]))
+    assert list(by_over["over"]) == list(by_phase["over"])
+
+    # Combining the two intersects rather than unions: overs 5-8 within the
+    # powerplay is overs 5-6 only.
+    both = store.apply(df, store.Filters(over_from=5, over_to=8, phases=["powerplay"]))
+    assert list(both["over"]) == [4, 5]
+
+
+# --------------------------------------------------------- chase-target filter
+def test_target_filter_selects_chases_of_a_given_size():
+    """``target_from``/``target_to`` bound the runs required to win.
+
+    A first innings has no target, so those deliveries must drop out of any
+    bounded query rather than count as a chase of zero.
+    """
+    df = pd.DataFrame({
+        "target_runs": [pd.NA, 150.0, 180.0, 181.0, 220.0],
+        "is_super_over": [False] * 5,
+    })
+    assert list(store.apply(df, store.Filters(target_from=180))["target_runs"]) == [180.0, 181.0, 220.0]
+    assert list(store.apply(df, store.Filters(target_to=180))["target_runs"]) == [150.0, 180.0]
+    # A band, and the first innings excluded from both ends.
+    band = store.apply(df, store.Filters(target_from=180, target_to=200))
+    assert list(band["target_runs"]) == [180.0, 181.0]
+    # No bound at all leaves the first innings in place.
+    assert len(store.apply(df, store.Filters())) == 5
+
+
+def test_result_filter_follows_the_side_being_measured():
+    """"In a winning cause" means the player's own side won.
+
+    Which side that is depends on the view: a batting leaderboard filters on
+    the batting team, a bowling one on the bowling team. The same Filters
+    object therefore has to mean different things to the two, which is why
+    `apply` compares the winner against `team_column` rather than a fixed one.
+    A tie has no winner and belongs to neither side.
+    """
+    import pandas as pd
+    from app.analytics.store import Filters, apply
+
+    df = pd.DataFrame({
+        "batting_team_id": [1, 2, 1],
+        "bowling_team_id": [2, 1, 2],
+        "winner_id": [1, 1, pd.NA],       # team 1 won, team 1 won, then a tie
+        "is_super_over": [False, False, False],
+        "runs": [10, 20, 30],
+    })
+    won_batting = apply(df, Filters(result="won"), team_column="batting_team_id")
+    assert list(won_batting["runs"]) == [10]          # only where team 1 batted
+
+    won_bowling = apply(df, Filters(result="won"), team_column="bowling_team_id")
+    assert list(won_bowling["runs"]) == [20]          # team 1 bowling, and won
+
+    lost = apply(df, Filters(result="lost"), team_column="batting_team_id")
+    assert list(lost["runs"]) == [20]
+
+    # The tie is in neither, and nothing silently adopts it.
+    assert 30 not in set(won_batting["runs"]) | set(lost["runs"])

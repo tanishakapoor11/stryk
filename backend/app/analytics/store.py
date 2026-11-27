@@ -290,11 +290,18 @@ def load() -> Dataset:
 _SCOPE_DISK_BUDGET = 4_000_000_000
 
 
+#: Bumped whenever the delivery frame gains or loses a column. Cached pickles
+#: are keyed by it, so an old cache is ignored rather than served without the
+#: column its reader expects.
+_FRAME_VERSION = 3
+
+
 def _scope_cache_path(competition_ids: Sequence[int]) -> Path:
     name = "-".join(str(int(i)) for i in competition_ids)
     if len(name) > 80:  # a scope of many competitions: name it by its digest
         name = hashlib.sha1(name.encode()).hexdigest()[:20]
-    return Path(str(engine.url.database or "")).parent / "scopes" / f"{name}.pkl"
+    return (Path(str(engine.url.database or "")).parent / "scopes"
+            / f"{name}-v{_FRAME_VERSION}.pkl")
 
 
 def _evict_scope_files(keep: Path) -> None:
@@ -338,6 +345,24 @@ def load_deliveries(competition_ids: Sequence[int], matches: pd.DataFrame) -> pd
     for col in ("date", "match_type", "competition_id", "season_id"):
         deliveries[col] = deliveries["match_id"].map(md[col]) if md is not None else None
     deliveries["date"] = pd.to_datetime(deliveries["date"])
+    # The runs required to win, attached to each ball of the chase so that
+    # "in a 180+ chase" is one filter and not a join the caller has to do.
+    # Null for a first innings, which has no target - and a null never
+    # satisfies a >= or <= comparison, so those balls drop out by themselves.
+    targets = _read(select(Innings.id, Innings.target_runs))
+    deliveries["target_runs"] = (
+        deliveries["innings_id"].map(targets.set_index("id")["target_runs"])
+        if not targets.empty else pd.NA
+    )
+    # The winning side, attached to each ball so "in a winning cause" is a
+    # filter rather than a join. Null where no winner was recorded - an
+    # abandoned match, or a tie with no super over - and such a match
+    # satisfies neither "won" nor "lost". A tie settled by a super over does
+    # have a winner, and counts as one.
+    deliveries["winner_id"] = (
+        deliveries["match_id"].map(md["winner_id"]) if md is not None else pd.NA
+    )
+
     # A handful of distinct values repeated on every ball: as a category this
     # costs ~0.3 MB instead of ~17 MB per 300k deliveries. It is only ever
     # filtered on (never grouped by), so category semantics cannot leak.
@@ -581,6 +606,23 @@ class Filters:
     #: Season row ids. Unlike ``seasons`` (calendar years) these identify a
     #: competition's season exactly, including ones spanning two years.
     season_ids: Optional[List[int]] = None
+    #: Inclusive over range as a person counts overs: "overs 17 to 20" is
+    #: (17, 20). Deliveries carry Cricsheet's 0-based number, so :func:`apply`
+    #: shifts by one. This generalises ``phases`` - a fixed three-way split -
+    #: and the two intersect when both are given.
+    over_from: Optional[int] = None
+    over_to: Optional[int] = None
+    #: Inclusive range on the runs required to win, so "a 180+ chase" is
+    #: ``target_from=180``. Only deliveries in a second innings carry a target,
+    #: so either bound also implies the delivery is part of a chase.
+    target_from: Optional[int] = None
+    target_to: Optional[int] = None
+    #: "won" or "lost", from the point of view of whichever side
+    #: :func:`apply` is filtering on - the batting side for a batting view,
+    #: the bowling side for a bowling one. A tie or an abandoned match has no
+    #: winner and so is in neither, which is the honest answer: "in a winning
+    #: cause" is not a claim anyone makes about an abandoned match.
+    result: Optional[str] = None
     applied: dict = field(default_factory=dict)
 
     def describe(self) -> dict:
@@ -599,6 +641,11 @@ class Filters:
                 "include_super_over": self.include_super_over,
                 "match_types": self.match_types,
                 "season_ids": self.season_ids,
+                "over_from": self.over_from,
+                "over_to": self.over_to,
+                "target_from": self.target_from,
+                "target_to": self.target_to,
+                "result": self.result,
             }.items()
             if v not in (None, [], False) or k == "include_super_over"
         }
@@ -628,6 +675,14 @@ def apply(df: pd.DataFrame, f: Filters, team_column: str = "batting_team_id") ->
         mask &= df["venue_id"].isin(f.venue_ids)
     if f.phases:
         mask &= df["phase"].isin(f.phases)
+    if f.over_from is not None:
+        mask &= df["over"] >= f.over_from - 1
+    if f.over_to is not None:
+        mask &= df["over"] <= f.over_to - 1
+    if f.target_from is not None:
+        mask &= df["target_runs"].notna() & (df["target_runs"] >= f.target_from)
+    if f.target_to is not None:
+        mask &= df["target_runs"].notna() & (df["target_runs"] <= f.target_to)
     if f.innings_number is not None:
         mask &= df["innings_number"] == f.innings_number
     if f.chasing is not None:
@@ -636,4 +691,8 @@ def apply(df: pd.DataFrame, f: Filters, team_column: str = "batting_team_id") ->
         mask &= df["date"] >= pd.Timestamp(f.date_from)
     if f.date_to is not None:
         mask &= df["date"] <= pd.Timestamp(f.date_to)
+    if f.result == "won":
+        mask &= df["winner_id"].notna() & (df["winner_id"] == df[team_column])
+    elif f.result == "lost":
+        mask &= df["winner_id"].notna() & (df["winner_id"] != df[team_column])
     return df[mask]
