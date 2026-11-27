@@ -182,6 +182,26 @@ export interface PlayerDirectory {
   filters: Record<string, unknown>;
 }
 
+/** A natural-language answer: a player directory plus how it was understood. */
+export interface AskAnswer extends PlayerDirectory {
+  question: string;
+  /** One sentence describing the query that was actually run. */
+  interpretation: string;
+  /**
+   * Every clause of the question that no filter could express, plus any team
+   * name or date that could not be resolved. Never hide this: the rows answer
+   * the question minus these, which is a different question.
+   */
+  unsupported: string[];
+  /**
+   * The competition slugs actually read. `interpretation` is the model's
+   * prose and can claim a competition the query never reached, so this is
+   * what the reader should be shown.
+   */
+  scope: string[];
+  minimums?: Record<string, number>;
+}
+
 export interface PlayerProfile {
   /** The competition scope this profile was computed over. */
   scope?: Scope;

@@ -11,8 +11,9 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
+from app.analytics import ask as ask_service
 from app.analytics import auction as auction_service
 from app.analytics import competitions as competition_service
 from app.analytics import matchups as matchup_service
@@ -163,6 +164,31 @@ def global_search(q: str = Query(..., min_length=2), limit: int = Query(12, le=5
     return out[: limit + 12]
 
 
+@router.post("/ask", tags=["meta"])
+def ask(
+    q: str = Body(..., embed=True, min_length=3, max_length=300,
+                  description="A question in plain English"),
+    limit: int = Query(10, ge=1, le=50),
+    competition: Optional[List[str]] = Depends(scope_params),
+):
+    """Answer a question by translating it into this API's own filters.
+
+    The reply carries ``interpretation`` and ``unsupported`` beside the rows:
+    the first says which query was built, the second lists every clause that
+    could not be expressed. A caller that shows the rows without them is
+    presenting an answer to a question that may not have been asked.
+    """
+    ds = _ds(competition)
+    try:
+        # No explicit scope means the question itself may choose one; an
+        # explicit one wins, and a question naming another is reported.
+        return ask_service.answer(
+            q, ds, limit=limit,
+            rescope=None if competition else (lambda slug: _ds([slug])))
+    except ask_service.AskUnavailable as exc:
+        raise HTTPException(503, f"Natural-language search is unavailable: {exc}")
+
+
 @router.get("/sitemap", tags=["meta"])
 def sitemap():
     """Every indexable entity, for the frontend's sitemap.xml.
@@ -241,11 +267,17 @@ def list_players(
     order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    min_balls: int = Query(0, ge=0, description="Qualification floor: balls faced"),
+    min_innings: int = Query(0, ge=0, description="Qualification floor: innings batted"),
+    min_runs: int = Query(0, ge=0, description="Qualification floor: runs scored"),
+    min_wickets: int = Query(0, ge=0, description="Qualification floor: wickets taken"),
     competition: Optional[List[str]] = Depends(scope_params),
 ):
     ds = _ds(competition)
     result = player_service.directory(
-        ds, f, search=q, role=role, sort=sort, order=order, limit=limit, offset=offset
+        ds, f, search=q, role=role, sort=sort, order=order, limit=limit, offset=offset,
+        min_balls=min_balls, min_innings=min_innings, min_runs=min_runs,
+        min_wickets=min_wickets,
     )
     result["scope"] = ds.scope.describe()
     return result

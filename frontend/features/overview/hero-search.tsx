@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, Sparkles } from "lucide-react";
 import { PlayerAvatar } from "@/components/ui/player-identity";
 import { cn } from "@/lib/utils";
 import type { SearchHit } from "@/types";
@@ -69,7 +69,7 @@ export function HeroSearch({
       <label htmlFor="hero-search" className="sr-only">
         Search players and teams
       </label>
-      <div className="flex items-center gap-3 rounded-xl border border-line-strong bg-surface-raised px-4 py-3.5 shadow-lift transition-colors focus-within:border-accent/60">
+      <div className="flex items-center gap-3 rounded-xl border border-line-strong bg-surface-raised px-4 py-3.5 shadow-lift transition-colors field-shell focus-within:border-accent/60">
         {loading ? (
           <Loader2 className="h-5 w-5 shrink-0 animate-spin text-accent" aria-hidden />
         ) : (
@@ -138,7 +138,17 @@ export function HeroSearch({
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="text-xs text-ink-faint">Try</span>
+        {/* The box above matches names. A question in prose belongs on /ask,
+            which costs a model call and so waits for Enter rather than firing
+            on every keystroke. */}
+        <Link
+          href="/ask"
+          className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/5 px-2.5 py-1 text-xs text-ink-muted transition-colors hover:border-accent/70 hover:text-ink"
+        >
+          <Sparkles className="h-3 w-3 text-accent" aria-hidden />
+          Ask a question instead
+        </Link>
+        <span className="text-xs text-ink-faint">or try</span>
         {suggestions.map((s) => (
           <Link
             key={s.id}
