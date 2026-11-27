@@ -73,7 +73,7 @@ export function GlobalSearch() {
 
   return (
     <div ref={boxRef} className="relative">
-      <div className="flex items-center gap-2 rounded border border-line-strong bg-surface px-2 py-1.5 focus-within:border-accent/50">
+      <div className="flex items-center gap-2 rounded border border-line-strong bg-surface px-2 py-1.5 field-shell focus-within:border-accent/50">
         {loading ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin text-ink-faint" aria-hidden />
         ) : (

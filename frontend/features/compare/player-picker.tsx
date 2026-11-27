@@ -94,7 +94,7 @@ export function PlayerPicker({
       {label ? <span className="label-xs mb-1 block">{label}</span> : null}
       <div
         className={cn(
-          "flex items-center gap-2 rounded border border-line-strong bg-surface-raised px-2 py-1.5 focus-within:border-accent/60",
+          "flex items-center gap-2 rounded border border-line-strong bg-surface-raised px-2 py-1.5 field-shell focus-within:border-accent/60",
           full && "opacity-50",
         )}
       >

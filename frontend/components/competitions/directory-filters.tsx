@@ -77,7 +77,7 @@ export function DirectoryFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded border border-line-strong bg-surface px-2 py-1.5 focus-within:border-accent/50 sm:max-w-xs">
+      <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded border border-line-strong bg-surface px-2 py-1.5 field-shell focus-within:border-accent/50 sm:max-w-xs">
         <Search className="h-3.5 w-3.5 text-ink-faint" aria-hidden />
         <input
           value={q}

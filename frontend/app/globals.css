@@ -24,6 +24,22 @@
   *:focus-visible {
     @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
   }
+  /*
+   * A control inside a .field-shell draws no ring of its own.
+   *
+   * The shell is the bordered box around a field - the search boxes, the
+   * question box, the player picker - and it already lights its border up on
+   * focus-within. Ringing the bare <input> as well stacks a second outline
+   * inside the first, which is the boxed-in look this removes.
+   *
+   * This narrows the rule rather than removing it: a control that is NOT in a
+   * shell keeps the ring, because nothing else would show it has focus. Any
+   * new field wrapper must therefore light up on focus-within itself before it
+   * takes this class.
+   */
+  .field-shell :is(input, textarea, select):focus-visible {
+    @apply ring-0 ring-offset-0;
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
