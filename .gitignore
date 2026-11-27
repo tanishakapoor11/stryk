@@ -10,6 +10,7 @@ __pycache__/
 data/raw/
 data/processed/
 !data/raw/auction/prices.csv
+data/refresh.log
 
 # Node
 node_modules/
